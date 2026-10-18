@@ -1,24 +1,75 @@
-// System State & LocalStorage Persistence
+// ==========================================
+// FIREBASE CONFIGURATION (Project: city-alert-123)
+// ==========================================
+const firebaseConfig = {
+  apiKey: "AIzaSyB-mquyQjD862qE20iK078xk0-5iLv40wA",
+  authDomain: "city-alert-123.firebaseapp.com",
+  databaseURL: "https://city-alert-123-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "city-alert-123",
+  storageBucket: "city-alert-123.firebasestorage.app",
+  messagingSenderId: "88853751811",
+  appId: "1:88853751811:web:96a3282dcf2e7a5eb0636",
+  measurementId: "G-N7BG5BWQGZ"
+};
+
+// Initialize Firebase
+let db = null;
+let reportsRef = null;
+
+try {
+  if (typeof firebase !== 'undefined') {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    reportsRef = db.ref('reports');
+  }
+} catch (e) {
+  console.warn("Firebase initialization error:", e);
+}
+
+// System State
 let isAdminLoggedIn = false;
 let notifications = [];
-
-const defaultReports = [
-  { id: 101, name: 'City Resident', category: 'Road Damage / Pothole', location: 'Main St. cor. 5th Ave', desc: 'Large pothole near crosswalk', status: 'Resolved', date: '10/18/2026' }
-];
-
-let reports = JSON.parse(localStorage.getItem('cityalert_reports')) || defaultReports;
+let reportsMap = {};
+let initialLoadComplete = false;
 
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof lucide !== 'undefined') {
     lucide.createIcons();
   }
-  updateStats();
-  renderUserSubmissions();
-});
 
-function saveReports() {
-  localStorage.setItem('cityalert_reports', JSON.stringify(reports));
-}
+  if (reportsRef) {
+    // Realtime Listener for Cross-Device Cloud Syncing
+    reportsRef.on('value', (snapshot) => {
+      const data = snapshot.val() || {};
+      
+      if (initialLoadComplete && isAdminLoggedIn) {
+        Object.keys(data).forEach(key => {
+          if (!reportsMap[key]) {
+            const newRep = data[key];
+            const newNotif = {
+              id: Date.now(),
+              message: `New report in ${newRep.location}: ${newRep.category}`,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              read: false
+            };
+            notifications.unshift(newNotif);
+            renderNotifications();
+          }
+        });
+      }
+
+      reportsMap = data;
+      initialLoadComplete = true;
+
+      updateStats();
+      renderUserSubmissions();
+      if (isAdminLoggedIn) renderAdminTable();
+    });
+  } else {
+    updateStats();
+    renderUserSubmissions();
+  }
+});
 
 // Modal Control
 function openLoginModal() {
@@ -79,9 +130,13 @@ function logoutAdmin() {
   toggleViewMode();
 }
 
-// Form Submission Handler
+// Public Submission Handler (Writes to Firebase Cloud)
 function handleFormSubmit(e) {
   e.preventDefault();
+
+  const submitBtn = document.getElementById('submit-btn');
+  submitBtn.disabled = true;
+  submitBtn.innerText = 'Submitting...';
 
   const name = document.getElementById('reporter-name').value;
   const category = document.getElementById('hazard-category').value;
@@ -89,41 +144,47 @@ function handleFormSubmit(e) {
   const desc = document.getElementById('hazard-desc').value;
 
   const newReport = {
-    id: Date.now(),
     name,
     category,
     location,
     desc,
     status: 'Pending',
-    date: new Date().toLocaleDateString()
+    date: new Date().toLocaleDateString(),
+    timestamp: Date.now()
   };
 
-  reports.unshift(newReport);
-  saveReports();
-
-  // Create Notification for Admin
-  const newNotif = {
-    id: Date.now(),
-    message: `New report by ${name}: ${category}`,
-    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    read: false
-  };
-  notifications.unshift(newNotif);
-
-  document.getElementById('hazard-form').reset();
-  updateStats();
-  renderUserSubmissions();
-  renderNotifications();
-  if (isAdminLoggedIn) renderAdminTable();
-
-  alert('Thank you! Your hazard report has been successfully submitted.');
+  if (reportsRef) {
+    reportsRef.push(newReport).then(() => {
+      document.getElementById('hazard-form').reset();
+      submitBtn.disabled = false;
+      submitBtn.innerText = 'Submit Hazard Report';
+      alert('Salamat! Your report has been submitted to General Santos City safety monitor.');
+    }).catch(err => {
+      submitBtn.disabled = false;
+      submitBtn.innerText = 'Submit Hazard Report';
+      alert('Error: ' + err.message);
+    });
+  } else {
+    submitBtn.disabled = false;
+    submitBtn.innerText = 'Submit Hazard Report';
+    alert('Database connection not established.');
+  }
 }
 
-// Update Stats
+// Convert Map to Sorted Array
+function getReportsArray() {
+  return Object.keys(reportsMap).map(key => ({
+    key,
+    ...reportsMap[key]
+  })).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+}
+
+// Update Dashboard Counters
 function updateStats() {
-  const total = reports.length;
-  const pending = reports.filter(r => r.status === 'Pending').length;
-  const resolved = reports.filter(r => r.status === 'Resolved').length;
+  const reportsList = getReportsArray();
+  const total = reportsList.length;
+  const pending = reportsList.filter(r => r.status === 'Pending').length;
+  const resolved = reportsList.filter(r => r.status === 'Resolved').length;
 
   document.getElementById('stat-total').innerText = total;
   document.getElementById('stat-pending').innerText = pending;
@@ -137,26 +198,27 @@ function updateStats() {
   }
 }
 
-// Render Public Table
+// Render Public Live Feed
 function renderUserSubmissions() {
   const tbody = document.getElementById('user-table-body');
   const countBadge = document.getElementById('user-report-count');
+  const reportsList = getReportsArray();
 
   if (!tbody) return;
 
-  countBadge.innerText = `${reports.length} Reports`;
+  countBadge.innerText = `${reportsList.length} Active Reports`;
 
-  if (reports.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">No active hazard reports submitted yet.</td></tr>`;
+  if (reportsList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">No active hazard reports submitted in General Santos City yet.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = reports.map(r => `
+  tbody.innerHTML = reportsList.map(r => `
     <tr class="hover:bg-slate-50/80 transition">
       <td class="p-3 font-semibold text-slate-800">${r.category}</td>
-      <td class="p-3">${r.location}</td>
+      <td class="p-3 font-medium text-blue-700">${r.location}</td>
       <td class="p-3 text-slate-500 max-w-xs truncate">${r.desc}</td>
-      <td class="p-3 text-slate-400">${r.date}</td>
+      <td class="p-3 text-slate-400">${r.date || 'Today'}</td>
       <td class="p-3 text-right">
         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
           r.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
@@ -172,20 +234,22 @@ function renderUserSubmissions() {
 // Render Admin Table
 function renderAdminTable() {
   const tbody = document.getElementById('admin-table-body');
+  const reportsList = getReportsArray();
+
   if (!tbody) return;
 
-  if (reports.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No reports in database.</td></tr>`;
+  if (reportsList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No reports in cloud database.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = reports.map(r => `
+  tbody.innerHTML = reportsList.map(r => `
     <tr class="hover:bg-slate-800/50 transition">
       <td class="p-3 font-semibold text-white">${r.name}</td>
       <td class="p-3 text-slate-300">${r.category}</td>
-      <td class="p-3 text-slate-300">${r.location}</td>
+      <td class="p-3 text-blue-400 font-medium">${r.location}</td>
       <td class="p-3 text-slate-400 max-w-xs truncate">${r.desc}</td>
-      <td class="p-3 text-slate-400">${r.date}</td>
+      <td class="p-3 text-slate-400">${r.date || 'Today'}</td>
       <td class="p-3">
         <span class="px-2 py-0.5 text-[10px] rounded-full font-semibold ${
           r.status === 'Resolved' ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700' : 'bg-amber-900/60 text-amber-300 border border-amber-700'
@@ -195,11 +259,11 @@ function renderAdminTable() {
       </td>
       <td class="p-3 text-right space-x-1.5">
         ${r.status === 'Pending' ? `
-          <button onclick="resolveReport(${r.id})" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
+          <button onclick="resolveReport('${r.key}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
             Resolve
           </button>
         ` : ''}
-        <button onclick="deleteReport(${r.id})" class="bg-red-600/80 hover:bg-red-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
+        <button onclick="deleteReport('${r.key}')" class="bg-red-600/80 hover:bg-red-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
           Delete
         </button>
       </td>
@@ -207,21 +271,16 @@ function renderAdminTable() {
   `).join('');
 }
 
-function resolveReport(id) {
-  const report = reports.find(r => r.id === id);
-  if (report) {
-    report.status = 'Resolved';
-    saveReports();
-    updateStats();
-    renderAdminTable();
+function resolveReport(key) {
+  if (reportsRef && key) {
+    reportsRef.child(key).update({ status: 'Resolved' });
   }
 }
 
-function deleteReport(id) {
-  reports = reports.filter(r => r.id !== id);
-  saveReports();
-  updateStats();
-  renderAdminTable();
+function deleteReport(key) {
+  if (reportsRef && key) {
+    reportsRef.child(key).remove();
+  }
 }
 
 // Notifications

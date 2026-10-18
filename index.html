@@ -3,12 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CityAlert - Community Hazard Reporting</title>
+  <title>CityAlert - General Santos City Hazard Reporting</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Firebase SDK (v10 Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  
   <!-- Custom Stylesheet -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -23,7 +28,10 @@
         <div class="bg-blue-600 text-white p-1.5 rounded-lg">
           <i data-lucide="shield-alert" class="w-5 h-5"></i>
         </div>
-        <span class="text-xl font-bold text-slate-900 tracking-tight">CityAlert</span>
+        <div class="flex flex-col">
+          <span class="text-xl font-bold text-slate-900 tracking-tight leading-none">CityAlert</span>
+          <span class="text-[10px] font-semibold text-blue-600 tracking-wider uppercase">General Santos City</span>
+        </div>
       </a>
 
       <!-- PUBLIC NAVIGATION -->
@@ -33,15 +41,13 @@
         <a href="#my-reports" class="text-slate-600 hover:text-blue-600 transition">Live Feed</a>
         <a href="#report-form" class="text-slate-600 hover:text-blue-600 transition">Report Hazard</a>
 
-        <!-- Discreet Admin Lock Trigger -->
         <button id="public-admin-trigger" onclick="openLoginModal()" title="Administrator Login" class="text-slate-400 hover:text-slate-600 transition p-1.5 rounded-md hover:bg-slate-100">
           <i data-lucide="lock" class="w-4 h-4"></i>
         </button>
       </nav>
 
-      <!-- ADMIN NAVIGATION (Visible ONLY when logged in as Admin) -->
+      <!-- ADMIN NAVIGATION -->
       <nav id="admin-nav" class="hidden items-center space-x-6 text-sm font-medium">
-        <!-- Notification Bell -->
         <div class="relative">
           <button id="notif-btn" onclick="toggleNotifications()" class="relative p-2 text-slate-600 hover:text-blue-600 focus:outline-none rounded-full hover:bg-slate-100 transition">
             <i data-lucide="bell" class="w-5 h-5"></i>
@@ -50,10 +56,9 @@
             </span>
           </button>
 
-          <!-- Notification Dropdown -->
           <div id="notif-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
             <div class="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-              <span class="font-bold text-xs text-slate-700 uppercase tracking-wider">Notifications</span>
+              <span class="font-bold text-xs text-slate-700 uppercase tracking-wider">LGU GenSan Notifications</span>
               <button onclick="clearNotifications()" class="text-xs text-blue-600 hover:underline font-medium">Clear all</button>
             </div>
             <div id="notif-list" class="max-h-64 overflow-y-auto divide-y divide-slate-100">
@@ -63,7 +68,7 @@
         </div>
 
         <span class="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-full border border-amber-200 flex items-center gap-1">
-          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-amber-600"></i> Administrator Mode
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-amber-600"></i> GenSan Admin Mode
         </span>
         <button onclick="logoutAdmin()" class="text-xs font-semibold text-slate-500 hover:text-red-600 transition flex items-center gap-1">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Logout
@@ -81,32 +86,37 @@
       
       <!-- HERO BANNER -->
       <section id="home" class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="bg-blue-100 text-blue-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+            LGU General Santos City
+          </span>
+        </div>
         <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2">
-          Community Hazard Reporting and City Safety Monitoring Portal
+          CityAlert: General Santos City Community Hazard Reporting & Safety Portal
         </h1>
         <p class="text-slate-600 text-sm max-w-2xl mb-6">
-          Help keep our community safe by reporting hazards and dangerous situations in your area.
+          Help keep General Santos City safe by reporting road damage, flooding, fallen debris, and public safety hazards in your barangay directly to city monitoring teams.
         </p>
         <a href="#report-form" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm text-sm transition">
-          Report a Hazard
+          Report a Hazard in GenSan
         </a>
       </section>
 
       <!-- SAFETY DASHBOARD STATS -->
       <section id="dashboard">
-        <h2 class="text-lg font-bold text-slate-900 mb-4">Safety Dashboard</h2>
+        <h2 class="text-lg font-bold text-slate-900 mb-4">GenSan Public Safety Dashboard</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Reports</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total City Reports</p>
             <p id="stat-total" class="text-4xl font-extrabold text-slate-900">0</p>
           </div>
           <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Pending Reports</p>
-            <p id="stat-pending" class="text-4xl font-extrabold text-slate-900">0</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Pending Action</p>
+            <p id="stat-pending" class="text-4xl font-extrabold text-amber-600">0</p>
           </div>
           <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Resolved Reports</p>
-            <p id="stat-resolved" class="text-4xl font-extrabold text-slate-900">0</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Resolved Hazards</p>
+            <p id="stat-resolved" class="text-4xl font-extrabold text-emerald-600">0</p>
           </div>
         </div>
       </section>
@@ -115,11 +125,11 @@
       <section id="my-reports" class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
-            <h2 class="text-lg font-bold text-slate-900">Live Community Hazard Feed</h2>
-            <p class="text-xs text-slate-500">Real-time status tracking</p>
+            <h2 class="text-lg font-bold text-slate-900">Live GenSan Community Hazard Feed</h2>
+            <p class="text-xs text-slate-500">Real-time status updates synced live across General Santos City barangays</p>
           </div>
           <span id="user-report-count" class="text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-100">
-            0 Reports
+            0 Active Reports
           </span>
         </div>
 
@@ -128,14 +138,14 @@
             <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-100">
               <tr>
                 <th class="p-3">Category</th>
-                <th class="p-3">Location</th>
-                <th class="p-3">Description</th>
+                <th class="p-3">Barangay / Location</th>
+                <th class="p-3">Hazard Description</th>
                 <th class="p-3">Date Submitted</th>
                 <th class="p-3 text-right">Status</th>
               </tr>
             </thead>
             <tbody id="user-table-body" class="divide-y divide-slate-100">
-              <!-- Dynamic Rows -->
+              <!-- Live Database Records -->
             </tbody>
           </table>
         </div>
@@ -143,13 +153,14 @@
 
       <!-- REPORT A HAZARD FORM -->
       <section id="report-form" class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm">
-        <h2 class="text-xl font-bold text-slate-900 mb-6">Report a Hazard</h2>
+        <h2 class="text-xl font-bold text-slate-900 mb-1">Report a Hazard in GenSan</h2>
+        <p class="text-xs text-slate-500 mb-6">Submit details to alert local authorities and fellow Generals.</p>
 
         <form id="hazard-form" onsubmit="handleFormSubmit(event)" class="space-y-5">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label class="block text-xs font-semibold text-slate-700 mb-2">Your Name</label>
-              <input type="text" id="reporter-name" required placeholder="Enter your name" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
+              <input type="text" id="reporter-name" required placeholder="e.g. Juan Dela Cruz" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
             </div>
 
             <div>
@@ -157,26 +168,27 @@
               <select id="hazard-category" required class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 bg-white">
                 <option value="" disabled selected>Select category</option>
                 <option value="Road Damage / Pothole">Road Damage / Pothole</option>
-                <option value="Flooding">Flooding</option>
-                <option value="Electrical Hazard">Electrical Hazard</option>
-                <option value="Fallen Tree / Debris">Fallen Tree / Debris</option>
-                <option value="Other Safety Concern">Other Safety Concern</option>
+                <option value="Street Flooding">Street Flooding</option>
+                <option value="Electrical / Sagging Cable Wire">Electrical / Sagging Cable Wire</option>
+                <option value="Fallen Tree / Debris Blockage">Fallen Tree / Debris Blockage</option>
+                <option value="Non-Functional Traffic Light">Non-Functional Traffic Light</option>
+                <option value="Other Public Safety Concern">Other Public Safety Concern</option>
               </select>
             </div>
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-2">Location</label>
-            <input type="text" id="hazard-location" required placeholder="Enter hazard location" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
+            <label class="block text-xs font-semibold text-slate-700 mb-2">Location / Barangay</label>
+            <input type="text" id="hazard-location" required placeholder="e.g. Lagao Highway, Calumpang, National Highway near Oval Plaza" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-2">Description</label>
-            <textarea id="hazard-desc" rows="4" required placeholder="Describe the hazard in detail..." class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"></textarea>
+            <label class="block text-xs font-semibold text-slate-700 mb-2">Hazard Description</label>
+            <textarea id="hazard-desc" rows="4" required placeholder="Provide specific details about the hazard (e.g. deep pothole near the intersection obstructing traffic)..." class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"></textarea>
           </div>
 
-          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm shadow-sm transition">
-            Submit Report
+          <button type="submit" id="submit-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm shadow-sm transition">
+            Submit Hazard Report
           </button>
         </form>
       </section>
@@ -193,22 +205,22 @@
               <i data-lucide="shield-check" class="w-6 h-6"></i>
             </div>
             <div>
-              <h1 class="text-xl font-bold text-white">Administrator Command Center</h1>
-              <p class="text-xs text-slate-400">Restricted Management View</p>
+              <h1 class="text-xl font-bold text-white">CityAlert: GenSan Admin Command Center</h1>
+              <p class="text-xs text-slate-400">Live Firebase Cloud Synchronization Active</p>
             </div>
           </div>
           <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-medium">
-            Active Session
+            LGU Authorized
           </span>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div class="bg-slate-800/80 p-5 rounded-lg border border-slate-700">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total System Reports</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total GenSan Reports</p>
             <p id="admin-stat-total" class="text-3xl font-extrabold text-white">0</p>
           </div>
           <div class="bg-slate-800/80 p-5 rounded-lg border border-slate-700">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Pending Action</p>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Pending LGU Action</p>
             <p id="admin-stat-pending" class="text-3xl font-extrabold text-amber-400">0</p>
           </div>
           <div class="bg-slate-800/80 p-5 rounded-lg border border-slate-700">
@@ -230,7 +242,7 @@
               <tr>
                 <th class="p-3">Reporter</th>
                 <th class="p-3">Category</th>
-                <th class="p-3">Location</th>
+                <th class="p-3">Barangay / Location</th>
                 <th class="p-3">Description</th>
                 <th class="p-3">Submitted</th>
                 <th class="p-3">Status</th>
@@ -238,7 +250,7 @@
               </tr>
             </thead>
             <tbody id="admin-table-body" class="divide-y divide-slate-800">
-              <!-- Admin Rows -->
+              <!-- Admin Records -->
             </tbody>
           </table>
         </div>
@@ -253,7 +265,7 @@
     <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 border border-slate-200">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-          <i data-lucide="shield-check" class="w-5 h-5 text-blue-600"></i> Admin Portal Login
+          <i data-lucide="shield-check" class="w-5 h-5 text-blue-600"></i> GenSan Admin Portal Login
         </h3>
         <button onclick="closeLoginModal()" class="text-slate-400 hover:text-slate-600">
           <i data-lucide="x" class="w-5 h-5"></i>
