@@ -26,19 +26,23 @@
         <span class="text-xl font-bold text-slate-900 tracking-tight">CityAlert</span>
       </a>
 
-      <nav class="flex items-center space-x-6 text-sm font-medium">
-        <!-- Navigation Links (Public) -->
+      <!-- PUBLIC NAVIGATION -->
+      <nav id="public-nav" class="flex items-center space-x-6 text-sm font-medium">
         <a href="#home" class="text-slate-600 hover:text-blue-600 transition">Home</a>
         <a href="#dashboard" class="text-slate-600 hover:text-blue-600 transition">Dashboard</a>
+        <a href="#my-reports" class="text-slate-600 hover:text-blue-600 transition">My Submissions</a>
         <a href="#report-form" class="text-slate-600 hover:text-blue-600 transition">Report Hazard</a>
 
         <!-- PUBLIC MODE: Discreet Lock Icon for Admin Login -->
         <button id="public-admin-trigger" onclick="openLoginModal()" title="Administrator Login" class="text-slate-400 hover:text-slate-600 transition p-1.5 rounded-md hover:bg-slate-100">
           <i data-lucide="lock" class="w-4 h-4"></i>
         </button>
+      </nav>
 
-        <!-- ADMIN MODE ONLY: Notification Bell Badge -->
-        <div id="admin-notif-container" class="relative hidden">
+      <!-- ADMIN NAVIGATION (Visible ONLY when logged in as Admin) -->
+      <nav id="admin-nav" class="hidden items-center space-x-6 text-sm font-medium">
+        <!-- ADMIN Notification Bell -->
+        <div class="relative">
           <button id="notif-btn" onclick="toggleNotifications()" class="relative p-2 text-slate-600 hover:text-blue-600 focus:outline-none rounded-full hover:bg-slate-100 transition">
             <i data-lucide="bell" class="w-5 h-5"></i>
             <span id="notif-badge" class="hidden absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
@@ -46,7 +50,7 @@
             </span>
           </button>
 
-          <!-- Notification Dropdown Menu -->
+          <!-- Notification Dropdown -->
           <div id="notif-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
             <div class="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
               <span class="font-bold text-xs text-slate-700 uppercase tracking-wider">Notifications</span>
@@ -58,127 +62,192 @@
           </div>
         </div>
 
-        <!-- ADMIN MODE ONLY: Session Badge & Logout -->
-        <div id="admin-badge" class="hidden items-center gap-2">
-          <span class="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-full border border-amber-200 flex items-center gap-1">
-            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-amber-600"></i> Admin
-          </span>
-          <button onclick="logoutAdmin()" class="text-xs font-semibold text-slate-500 hover:text-red-600 transition">
-            Logout
-          </button>
-        </div>
+        <span class="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-full border border-amber-200 flex items-center gap-1">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-amber-600"></i> Administrator Mode
+        </span>
+        <button onclick="logoutAdmin()" class="text-xs font-semibold text-slate-500 hover:text-red-600 transition flex items-center gap-1">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Logout
+        </button>
       </nav>
+
     </div>
   </header>
 
   <!-- MAIN CONTAINER -->
   <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full space-y-8">
 
-    <!-- HERO BANNER -->
-    <section id="home" class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm">
-      <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2">
-        Community Hazard Reporting and City Safety Monitoring Portal
-      </h1>
-      <p class="text-slate-600 text-sm max-w-2xl mb-6">
-        Help keep our community safe by reporting hazards and dangerous situations in your area.
-      </p>
-      <a href="#report-form" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm text-sm transition">
-        Report a Hazard
-      </a>
-    </section>
-
-    <!-- SAFETY DASHBOARD STATS -->
-    <section id="dashboard">
-      <h2 class="text-lg font-bold text-slate-900 mb-4">Safety Dashboard</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Reports</p>
-          <p id="stat-total" class="text-4xl font-extrabold text-slate-900">1</p>
-        </div>
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Pending Reports</p>
-          <p id="stat-pending" class="text-4xl font-extrabold text-slate-900">0</p>
-        </div>
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Resolved Reports</p>
-          <p id="stat-resolved" class="text-4xl font-extrabold text-slate-900">1</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ADMIN REPORT MANAGEMENT PANEL (Admin Only) -->
-    <section id="admin-panel" class="hidden bg-slate-900 text-white rounded-xl p-6 shadow-lg border border-slate-800 space-y-4">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
-        <div class="flex items-center gap-2">
-          <div class="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg">
-            <i data-lucide="shield-check" class="w-5 h-5"></i>
-          </div>
-          <div>
-            <h2 class="text-base font-bold text-white">Administrator Control Panel</h2>
-            <p class="text-xs text-slate-400">Review incoming reports and manage city hazard status</p>
-          </div>
-        </div>
-        <span class="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded-full border border-slate-700">Protected Session</span>
-      </div>
+    <!-- PUBLIC VIEW CONTAINER (Hidden when Admin is logged in) -->
+    <div id="public-view-container" class="space-y-8">
       
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs text-slate-300">
-          <thead class="bg-slate-800/80 text-slate-400 uppercase font-semibold">
-            <tr>
-              <th class="p-3">Reporter</th>
-              <th class="p-3">Category</th>
-              <th class="p-3">Location</th>
-              <th class="p-3">Description</th>
-              <th class="p-3">Status</th>
-              <th class="p-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="admin-table-body" class="divide-y divide-slate-800">
-            <!-- Dynamic hazard rows inserted here -->
-          </tbody>
-        </table>
-      </div>
-    </section>
+      <!-- HERO BANNER -->
+      <section id="home" class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm">
+        <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2">
+          Community Hazard Reporting and City Safety Monitoring Portal
+        </h1>
+        <p class="text-slate-600 text-sm max-w-2xl mb-6">
+          Help keep our community safe by reporting hazards and dangerous situations in your area.
+        </p>
+        <a href="#report-form" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm text-sm transition">
+          Report a Hazard
+        </a>
+      </section>
 
-    <!-- PUBLIC REPORT A HAZARD FORM -->
-    <section id="report-form" class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm">
-      <h2 class="text-xl font-bold text-slate-900 mb-6">Report a Hazard</h2>
+      <!-- SAFETY DASHBOARD STATS -->
+      <section id="dashboard">
+        <h2 class="text-lg font-bold text-slate-900 mb-4">Safety Dashboard</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Reports</p>
+            <p id="stat-total" class="text-4xl font-extrabold text-slate-900">0</p>
+          </div>
+          <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Pending Reports</p>
+            <p id="stat-pending" class="text-4xl font-extrabold text-slate-900">0</p>
+          </div>
+          <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Resolved Reports</p>
+            <p id="stat-resolved" class="text-4xl font-extrabold text-slate-900">0</p>
+          </div>
+        </div>
+      </section>
 
-      <form id="hazard-form" onsubmit="handleFormSubmit(event)" class="space-y-5">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- PUBLIC SUBMISSIONS TRACKER -->
+      <section id="my-reports" class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-2">Your Name</label>
-            <input type="text" id="reporter-name" required placeholder="Enter your name" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            <h2 class="text-lg font-bold text-slate-900">My Submissions & Status</h2>
+            <p class="text-xs text-slate-500">Track the status of hazard reports submitted from this browser</p>
+          </div>
+          <span id="user-report-count" class="text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-100">
+            0 Submitted
+          </span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-600">
+            <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-100">
+              <tr>
+                <th class="p-3">Category</th>
+                <th class="p-3">Location</th>
+                <th class="p-3">Description</th>
+                <th class="p-3">Date Submitted</th>
+                <th class="p-3 text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody id="user-table-body" class="divide-y divide-slate-100">
+              <!-- Dynamic User Submitted Rows -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PUBLIC REPORT A HAZARD FORM -->
+      <section id="report-form" class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-900 mb-6">Report a Hazard</h2>
+
+        <form id="hazard-form" onsubmit="handleFormSubmit(event)" class="space-y-5">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-2">Your Name</label>
+              <input type="text" id="reporter-name" required placeholder="Enter your name" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-2">Hazard Category</label>
+              <select id="hazard-category" required class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white">
+                <option value="" disabled selected>Select category</option>
+                <option value="Road Damage / Pothole">Road Damage / Pothole</option>
+                <option value="Flooding">Flooding</option>
+                <option value="Electrical Hazard">Electrical Hazard</option>
+                <option value="Fallen Tree / Debris">Fallen Tree / Debris</option>
+                <option value="Other Safety Concern">Other Safety Concern</option>
+              </select>
+            </div>
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-2">Hazard Category</label>
-            <select id="hazard-category" required class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white">
-              <option value="" disabled selected>Select category</option>
-              <option value="Road Damage / Pothole">Road Damage / Pothole</option>
-              <option value="Flooding">Flooding</option>
-              <option value="Electrical Hazard">Electrical Hazard</option>
-              <option value="Fallen Tree / Debris">Fallen Tree / Debris</option>
-              <option value="Other Safety Concern">Other Safety Concern</option>
-            </select>
+            <label class="block text-xs font-semibold text-slate-700 mb-2">Location</label>
+            <input type="text" id="hazard-location" required placeholder="Enter hazard location (e.g., Street name, Landmark)" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-2">Description</label>
+            <textarea id="hazard-desc" rows="4" required placeholder="Describe the hazard in detail..." class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
+          </div>
+
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm shadow-sm transition">
+            Submit Report
+          </button>
+        </form>
+      </section>
+
+    </div>
+
+    <!-- EXCLUSIVE ADMINISTRATOR WORKSPACE (Visible ONLY when logged in as Admin) -->
+    <div id="admin-view-container" class="hidden space-y-8">
+      
+      <!-- ADMIN HEADER & METRICS -->
+      <section class="bg-slate-900 text-white rounded-xl p-6 shadow-md border border-slate-800 space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div class="flex items-center gap-3">
+            <div class="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl">
+              <i data-lucide="shield-check" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <h1 class="text-xl font-bold text-white">Administrator Command Center</h1>
+              <p class="text-xs text-slate-400">Authorized personnel view for hazard monitoring and status management</p>
+            </div>
+          </div>
+          <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-medium">
+            Active Session
+          </span>
+        </div>
+
+        <!-- ADMIN ANALYTICS CARDS -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="bg-slate-800/80 p-5 rounded-lg border border-slate-700">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total System Reports</p>
+            <p id="admin-stat-total" class="text-3xl font-extrabold text-white">0</p>
+          </div>
+          <div class="bg-slate-800/80 p-5 rounded-lg border border-slate-700">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Pending Action</p>
+            <p id="admin-stat-pending" class="text-3xl font-extrabold text-amber-400">0</p>
+          </div>
+          <div class="bg-slate-800/80 p-5 rounded-lg border border-slate-700">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Resolved Hazards</p>
+            <p id="admin-stat-resolved" class="text-3xl font-extrabold text-emerald-400">0</p>
           </div>
         </div>
+      </section>
 
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-2">Location</label>
-          <input type="text" id="hazard-location" required placeholder="Enter hazard location (e.g., Street name, Landmark)" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+      <!-- ADMIN MANAGED HAZARDS TABLE -->
+      <section class="bg-slate-900 text-white rounded-xl p-6 shadow-md border border-slate-800 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 class="text-base font-bold text-white">Citizen Hazard Reports Database</h2>
+          <span class="text-xs text-slate-400">Real-time status controls</span>
         </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-2">Description</label>
-          <textarea id="hazard-desc" rows="4" required placeholder="Describe the hazard in detail..." class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
+        
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-800 text-slate-400 uppercase font-semibold">
+              <tr>
+                <th class="p-3">Reporter</th>
+                <th class="p-3">Category</th>
+                <th class="p-3">Location</th>
+                <th class="p-3">Description</th>
+                <th class="p-3">Submitted</th>
+                <th class="p-3">Status</th>
+                <th class="p-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="admin-table-body" class="divide-y divide-slate-800">
+              <!-- Dynamic Hazard Rows -->
+            </tbody>
+          </table>
         </div>
+      </section>
 
-        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm shadow-sm transition">
-          Submit Report
-        </button>
-      </form>
-    </section>
+    </div>
 
   </main>
 
@@ -187,7 +256,7 @@
     <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 border border-slate-200">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-          <i data-lucide="shield-check" class="w-5 h-5 text-blue-600"></i> Admin Portal
+          <i data-lucide="shield-check" class="w-5 h-5 text-blue-600"></i> Admin Portal Login
         </h3>
         <button onclick="closeLoginModal()" class="text-slate-400 hover:text-slate-600">
           <i data-lucide="x" class="w-5 h-5"></i>
@@ -203,7 +272,7 @@
           <label class="block text-xs font-semibold text-slate-700 mb-1">Password</label>
           <input type="password" id="admin-pass" required placeholder="••••••••" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
         </div>
-        <p id="login-error" class="text-xs text-red-500 hidden font-medium">Invalid username or password (use admin / admin123)</p>
+        <p id="login-error" class="text-xs text-red-500 hidden font-medium">Invalid credentials (admin / admin123)</p>
         
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" onclick="closeLoginModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancel</button>
@@ -213,7 +282,7 @@
     </div>
   </div>
 
-  <!-- Deferred Script Loading to avoid Blank Page Errors -->
+  <!-- Script File -->
   <script src="script.js" defer></script>
 </body>
 </html>
