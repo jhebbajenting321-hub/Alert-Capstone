@@ -1,117 +1,108 @@
-let isAdminLoggedIn = false;
-let autoRefreshTimer = null;
+// ==========================================
+// FIREBASE CLOUD DATABASE CONFIGURATION
+// Configured with a live test database endpoint for instant GitHub Pages syncing
+// ==========================================
+const firebaseConfig = {
+  databaseURL: "https://cityalert-app-default-rtdb.asia-southeast1.firebasedatabase.app"
+};
 
+// Initialize Firebase App & Realtime Database instance
+let db = null;
+let reportsRef = null;
+
+try {
+  if (typeof firebase !== 'undefined') {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    reportsRef = db.ref('reports');
+  }
+} catch (e) {
+  console.warn("Firebase initialization warning:", e);
+}
+
+// System State
+let isAdminLoggedIn = false;
+let notifications = [];
+let reportsMap = {}; 
+let initialLoadComplete = false;
+
+// DOM Ready Initialization
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof lucide !== 'undefined') {
     lucide.createIcons();
   }
-  loadPublicData();
-  
-  // Auto refresh data every 5 seconds
-  autoRefreshTimer = setInterval(() => {
-    if (isAdminLoggedIn) {
-      loadAdminData();
-    } else {
-      loadPublicData();
-    }
-  }, 5000);
+
+  if (reportsRef) {
+    // Realtime Listener for Cloud Syncing across all devices
+    reportsRef.on('value', (snapshot) => {
+      const data = snapshot.val() || {};
+      
+      if (initialLoadComplete && isAdminLoggedIn) {
+        Object.keys(data).forEach(key => {
+          if (!reportsMap[key]) {
+            const newRep = data[key];
+            const newNotif = {
+              id: Date.now(),
+              message: `New report by ${newRep.name}: ${newRep.category}`,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              read: false
+            };
+            notifications.unshift(newNotif);
+            renderNotifications();
+          }
+        });
+      }
+
+      reportsMap = data;
+      initialLoadComplete = true;
+
+      updateStats();
+      renderUserSubmissions();
+      if (isAdminLoggedIn) renderAdminTable();
+    }, (error) => {
+      console.error("Database Read Error:", error);
+    });
+  } else {
+    updateStats();
+    renderUserSubmissions();
+  }
 });
 
-// Fetch Public Feed and Stats from PHP
-function loadPublicData() {
-  fetch('api.php?action=get_public_feed')
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        updateStats(data.stats);
-        renderPublicTable(data.reports);
-      }
-    })
-    .catch(err => console.error("Error loading public data:", err));
-}
-
-// Fetch Admin Data & Notifications from PHP
-function loadAdminData() {
-  fetch('api.php?action=get_admin_data')
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        renderAdminTable(data.reports);
-        renderNotifications(data.notifications);
-        
-        // Recalculate stats
-        const total = data.reports.length;
-        const pending = data.reports.filter(r => r.status === 'Pending').length;
-        const resolved = data.reports.filter(r => r.status === 'Resolved').length;
-        updateStats({ total, pending, resolved });
-      }
-    })
-    .catch(err => console.error("Error loading admin data:", err));
-}
-
-// Public Form Submission
-function handleFormSubmit(e) {
-  e.preventDefault();
-
-  const name = document.getElementById('reporter-name').value;
-  const category = document.getElementById('hazard-category').value;
-  const location = document.getElementById('hazard-location').value;
-  const desc = document.getElementById('hazard-desc').value;
-
-  fetch('api.php?action=submit_report', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, category, location, desc })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      document.getElementById('hazard-form').reset();
-      alert('Thank you! Your report has been saved to the database.');
-      loadPublicData();
-    } else {
-      alert(data.message || 'Submission failed.');
-    }
-  })
-  .catch(err => alert('Network error: ' + err.message));
-}
-
-// Modal Control
+// Modal Controls
 function openLoginModal() {
-  document.getElementById('login-modal').classList.remove('hidden');
-  document.getElementById('login-modal').classList.add('flex');
+  const modal = document.getElementById('login-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
 }
 
 function closeLoginModal() {
-  document.getElementById('login-modal').classList.add('hidden');
-  document.getElementById('login-modal').classList.remove('flex');
-  document.getElementById('login-error').classList.add('hidden');
+  const modal = document.getElementById('login-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+  const errorMsg = document.getElementById('login-error');
+  if (errorMsg) errorMsg.classList.add('hidden');
 }
 
-// Admin Login
+// Admin Authentication (admin / admin123)
 function handleAdminLogin(e) {
   e.preventDefault();
   const user = document.getElementById('admin-user').value;
   const pass = document.getElementById('admin-pass').value;
 
-  fetch('api.php?action=login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user, pass })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      isAdminLoggedIn = true;
-      closeLoginModal();
-      toggleViewMode();
-    } else {
-      document.getElementById('login-error').classList.remove('hidden');
-    }
-  });
+  if (user === 'admin' && pass === 'admin123') {
+    isAdminLoggedIn = true;
+    closeLoginModal();
+    toggleViewMode();
+  } else {
+    document.getElementById('login-error').classList.remove('hidden');
+  }
 }
 
-// Toggle Views
+// Toggle View Modes
 function toggleViewMode() {
   const publicNav = document.getElementById('public-nav');
   const adminNav = document.getElementById('admin-nav');
@@ -119,61 +110,143 @@ function toggleViewMode() {
   const adminView = document.getElementById('admin-view-container');
 
   if (isAdminLoggedIn) {
-    publicNav.classList.add('hidden');
-    publicView.classList.add('hidden');
-    adminNav.classList.remove('hidden');
-    adminNav.classList.add('flex');
-    adminView.classList.remove('hidden');
-    loadAdminData();
+    if (publicNav) publicNav.classList.add('hidden');
+    if (publicView) publicView.classList.add('hidden');
+
+    if (adminNav) {
+      adminNav.classList.remove('hidden');
+      adminNav.classList.add('flex');
+    }
+    if (adminView) adminView.classList.remove('hidden');
+
+    renderAdminTable();
+    updateStats();
   } else {
-    publicNav.classList.remove('hidden');
-    publicView.classList.remove('hidden');
-    adminNav.classList.add('hidden');
-    adminNav.classList.remove('flex');
-    adminView.classList.add('hidden');
-    loadPublicData();
+    if (publicNav) publicNav.classList.remove('hidden');
+    if (publicView) publicView.classList.remove('hidden');
+
+    if (adminNav) {
+      adminNav.classList.add('hidden');
+      adminNav.classList.remove('flex');
+    }
+    if (adminView) adminView.classList.add('hidden');
+
+    const dropdown = document.getElementById('notif-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+
+    renderUserSubmissions();
+    updateStats();
   }
 }
 
 function logoutAdmin() {
-  fetch('api.php?action=logout')
-    .then(() => {
-      isAdminLoggedIn = false;
-      toggleViewMode();
-    });
+  isAdminLoggedIn = false;
+  toggleViewMode();
 }
 
-// Render Public Stats & Feed
-function updateStats(stats) {
-  document.getElementById('stat-total').innerText = stats.total || 0;
-  document.getElementById('stat-pending').innerText = stats.pending || 0;
-  document.getElementById('stat-resolved').innerText = stats.resolved || 0;
+// Public Submission Handler (Writes directly to Cloud Database)
+function handleFormSubmit(e) {
+  e.preventDefault();
 
-  const adminTotal = document.getElementById('admin-stat-total');
-  if (adminTotal) {
-    adminTotal.innerText = stats.total || 0;
-    document.getElementById('admin-stat-pending').innerText = stats.pending || 0;
-    document.getElementById('admin-stat-resolved').innerText = stats.resolved || 0;
+  const submitBtn = document.getElementById('submit-btn');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'Submitting...';
+  }
+
+  const name = document.getElementById('reporter-name').value;
+  const category = document.getElementById('hazard-category').value;
+  const location = document.getElementById('hazard-location').value;
+  const desc = document.getElementById('hazard-desc').value;
+
+  const newReport = {
+    name,
+    category,
+    location,
+    desc,
+    status: 'Pending',
+    date: new Date().toLocaleDateString(),
+    timestamp: Date.now()
+  };
+
+  if (reportsRef) {
+    reportsRef.push(newReport).then(() => {
+      document.getElementById('hazard-form').reset();
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Submit Report';
+      }
+      alert('Thank you! Your hazard report has been successfully submitted.');
+    }).catch(err => {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Submit Report';
+      }
+      alert('Submission error: ' + err.message);
+    });
+  } else {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = 'Submit Report';
+    }
+    alert('Database connection not established.');
   }
 }
 
-function renderPublicTable(reports) {
+// Convert Map Object to Sorted Array
+function getReportsArray() {
+  return Object.keys(reportsMap).map(key => ({
+    key,
+    ...reportsMap[key]
+  })).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+}
+
+// Update Dashboard Counters
+function updateStats() {
+  const reportsList = getReportsArray();
+  const total = reportsList.length;
+  const pending = reportsList.filter(r => r.status === 'Pending').length;
+  const resolved = reportsList.filter(r => r.status === 'Resolved').length;
+
+  const totalEl = document.getElementById('stat-total');
+  const pendingEl = document.getElementById('stat-pending');
+  const resolvedEl = document.getElementById('stat-resolved');
+
+  if (totalEl) totalEl.innerText = total;
+  if (pendingEl) pendingEl.innerText = pending;
+  if (resolvedEl) resolvedEl.innerText = resolved;
+
+  const adminTotalEl = document.getElementById('admin-stat-total');
+  const adminPendingEl = document.getElementById('admin-stat-pending');
+  const adminResolvedEl = document.getElementById('admin-stat-resolved');
+
+  if (adminTotalEl) adminTotalEl.innerText = total;
+  if (adminPendingEl) adminPendingEl.innerText = pending;
+  if (adminResolvedEl) adminResolvedEl.innerText = resolved;
+}
+
+// Render Public Live Feed
+function renderUserSubmissions() {
   const tbody = document.getElementById('user-table-body');
-  const badge = document.getElementById('user-report-count');
+  const countBadge = document.getElementById('user-report-count');
+  const reportsList = getReportsArray();
 
-  badge.innerText = `${reports.length} Reports`;
+  if (!tbody) return;
 
-  if (reports.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">No hazard reports submitted yet.</td></tr>`;
+  if (reportsList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">No active hazard reports submitted yet.</td></tr>`;
+    if (countBadge) countBadge.innerText = '0 Reports Active';
     return;
   }
 
-  tbody.innerHTML = reports.map(r => `
+  if (countBadge) countBadge.innerText = `${reportsList.length} Reports Active`;
+
+  tbody.innerHTML = reportsList.map(r => `
     <tr class="hover:bg-slate-50/80 transition">
       <td class="p-3 font-semibold text-slate-800">${r.category}</td>
       <td class="p-3">${r.location}</td>
-      <td class="p-3 text-slate-500 max-w-xs truncate">${r.description}</td>
-      <td class="p-3 text-slate-400">${r.date}</td>
+      <td class="p-3 text-slate-500 max-w-xs truncate">${r.desc}</td>
+      <td class="p-3 text-slate-400">${r.date || 'Today'}</td>
       <td class="p-3 text-right">
         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
           r.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
@@ -186,22 +259,25 @@ function renderPublicTable(reports) {
   `).join('');
 }
 
-// Render Admin Control Table
-function renderAdminTable(reports) {
+// Render Administrator Database Table
+function renderAdminTable() {
   const tbody = document.getElementById('admin-table-body');
+  const reportsList = getReportsArray();
 
-  if (reports.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No reports in database.</td></tr>`;
+  if (!tbody) return;
+
+  if (reportsList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No reports in cloud database.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = reports.map(r => `
+  tbody.innerHTML = reportsList.map(r => `
     <tr class="hover:bg-slate-800/50 transition">
       <td class="p-3 font-semibold text-white">${r.name}</td>
       <td class="p-3 text-slate-300">${r.category}</td>
       <td class="p-3 text-slate-300">${r.location}</td>
       <td class="p-3 text-slate-400 max-w-xs truncate">${r.desc}</td>
-      <td class="p-3 text-slate-400">${r.date}</td>
+      <td class="p-3 text-slate-400">${r.date || 'Today'}</td>
       <td class="p-3">
         <span class="px-2 py-0.5 text-[10px] rounded-full font-semibold ${
           r.status === 'Resolved' ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700' : 'bg-amber-900/60 text-amber-300 border border-amber-700'
@@ -211,11 +287,11 @@ function renderAdminTable(reports) {
       </td>
       <td class="p-3 text-right space-x-1.5">
         ${r.status === 'Pending' ? `
-          <button onclick="resolveReport(${r.id})" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
+          <button onclick="resolveReport('${r.key}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
             Resolve
           </button>
         ` : ''}
-        <button onclick="deleteReport(${r.id})" class="bg-red-600/80 hover:bg-red-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
+        <button onclick="deleteReport('${r.key}')" class="bg-red-600/80 hover:bg-red-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
           Delete
         </button>
       </td>
@@ -223,47 +299,62 @@ function renderAdminTable(reports) {
   `).join('');
 }
 
-function resolveReport(id) {
-  fetch('api.php?action=resolve_report', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id })
-  }).then(() => loadAdminData());
-}
-
-function deleteReport(id) {
-  fetch('api.php?action=delete_report', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id })
-  }).then(() => loadAdminData());
-}
-
-// Notifications
-function renderNotifications(notifs) {
-  const badge = document.getElementById('notif-badge');
-  const list = document.getElementById('notif-list');
-
-  if (notifs.length > 0) {
-    badge.innerText = notifs.length;
-    badge.classList.remove('hidden');
-    list.innerHTML = notifs.map(n => `
-      <div class="p-3 text-xs bg-blue-50/60 hover:bg-slate-50 transition">
-        <p class="font-semibold text-slate-800 mb-1">New report by ${n.reporter_name}: ${n.category}</p>
-        <span class="text-[10px] text-slate-400">${n.time}</span>
-      </div>
-    `).join('');
-  } else {
-    badge.classList.add('hidden');
-    list.innerHTML = `<p class="p-4 text-xs text-slate-400 text-center">No new notifications</p>`;
+// Resolve Report in Cloud
+function resolveReport(key) {
+  if (reportsRef && key) {
+    reportsRef.child(key).update({ status: 'Resolved' });
   }
 }
 
+// Delete Report from Cloud
+function deleteReport(key) {
+  if (reportsRef && key) {
+    reportsRef.child(key).remove();
+  }
+}
+
+// Notifications Logic
 function toggleNotifications() {
-  document.getElementById('notif-dropdown').classList.toggle('hidden');
+  const dropdown = document.getElementById('notif-dropdown');
+  if (dropdown) {
+    dropdown.classList.toggle('hidden');
+    if (!dropdown.classList.contains('hidden')) {
+      notifications.forEach(n => n.read = true);
+      renderNotifications();
+    }
+  }
+}
+
+function renderNotifications() {
+  const badge = document.getElementById('notif-badge');
+  const list = document.getElementById('notif-list');
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  if (badge) {
+    if (unreadCount > 0) {
+      badge.innerText = unreadCount;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  if (list) {
+    if (notifications.length === 0) {
+      list.innerHTML = `<p class="p-4 text-xs text-slate-400 text-center">No new notifications</p>`;
+      return;
+    }
+
+    list.innerHTML = notifications.map(n => `
+      <div class="p-3 text-xs hover:bg-slate-50 transition ${!n.read ? 'bg-blue-50/60' : ''}">
+        <p class="font-semibold text-slate-800 mb-1">${n.message}</p>
+        <span class="text-[10px] text-slate-400">${n.time}</span>
+      </div>
+    `).join('');
+  }
 }
 
 function clearNotifications() {
-  fetch('api.php?action=clear_notifs', { method: 'POST' })
-    .then(() => loadAdminData());
+  notifications = [];
+  renderNotifications();
 }
