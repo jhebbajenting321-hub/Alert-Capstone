@@ -9,6 +9,11 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Firebase JS App and Database SDK (v10.8.0) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  
   <!-- Custom Stylesheet -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -30,10 +35,10 @@
       <nav id="public-nav" class="flex items-center space-x-6 text-sm font-medium">
         <a href="#home" class="text-slate-600 hover:text-blue-600 transition">Home</a>
         <a href="#dashboard" class="text-slate-600 hover:text-blue-600 transition">Dashboard</a>
-        <a href="#my-reports" class="text-slate-600 hover:text-blue-600 transition">My Submissions</a>
+        <a href="#my-reports" class="text-slate-600 hover:text-blue-600 transition">Live Reports</a>
         <a href="#report-form" class="text-slate-600 hover:text-blue-600 transition">Report Hazard</a>
 
-        <!-- PUBLIC MODE: Discreet Lock Icon for Admin Login -->
+        <!-- PUBLIC MODE: Hidden Lock Icon for Admin Access -->
         <button id="public-admin-trigger" onclick="openLoginModal()" title="Administrator Login" class="text-slate-400 hover:text-slate-600 transition p-1.5 rounded-md hover:bg-slate-100">
           <i data-lucide="lock" class="w-4 h-4"></i>
         </button>
@@ -53,7 +58,7 @@
           <!-- Notification Dropdown -->
           <div id="notif-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
             <div class="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-              <span class="font-bold text-xs text-slate-700 uppercase tracking-wider">Notifications</span>
+              <span class="font-bold text-xs text-slate-700 uppercase tracking-wider">Cloud Notifications</span>
               <button onclick="clearNotifications()" class="text-xs text-blue-600 hover:underline font-medium">Clear all</button>
             </div>
             <div id="notif-list" class="max-h-64 overflow-y-auto divide-y divide-slate-100">
@@ -76,7 +81,7 @@
   <!-- MAIN CONTAINER -->
   <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full space-y-8">
 
-    <!-- PUBLIC VIEW CONTAINER (Hidden when Admin is logged in) -->
+    <!-- PUBLIC VIEW CONTAINER -->
     <div id="public-view-container" class="space-y-8">
       
       <!-- HERO BANNER -->
@@ -111,15 +116,15 @@
         </div>
       </section>
 
-      <!-- PUBLIC SUBMISSIONS TRACKER -->
+      <!-- LIVE PUBLIC COMMUNITY FEED -->
       <section id="my-reports" class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
-            <h2 class="text-lg font-bold text-slate-900">My Submissions & Status</h2>
-            <p class="text-xs text-slate-500">Track the status of hazard reports submitted from this browser</p>
+            <h2 class="text-lg font-bold text-slate-900">Live Community Hazard Feed</h2>
+            <p class="text-xs text-slate-500">Real-time status updates synced across all citizens and city departments</p>
           </div>
           <span id="user-report-count" class="text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-100">
-            0 Submitted
+            0 Reports Active
           </span>
         </div>
 
@@ -135,7 +140,7 @@
               </tr>
             </thead>
             <tbody id="user-table-body" class="divide-y divide-slate-100">
-              <!-- Dynamic User Submitted Rows -->
+              <!-- Dynamic Rows Fetched Live from Firebase -->
             </tbody>
           </table>
         </div>
@@ -175,15 +180,15 @@
             <textarea id="hazard-desc" rows="4" required placeholder="Describe the hazard in detail..." class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
           </div>
 
-          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm shadow-sm transition">
-            Submit Report
+          <button type="submit" id="submit-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm shadow-sm transition flex items-center gap-2">
+            <span>Submit Report</span>
           </button>
         </form>
       </section>
 
     </div>
 
-    <!-- EXCLUSIVE ADMINISTRATOR WORKSPACE (Visible ONLY when logged in as Admin) -->
+    <!-- EXCLUSIVE ADMINISTRATOR WORKSPACE -->
     <div id="admin-view-container" class="hidden space-y-8">
       
       <!-- ADMIN HEADER & METRICS -->
@@ -195,11 +200,11 @@
             </div>
             <div>
               <h1 class="text-xl font-bold text-white">Administrator Command Center</h1>
-              <p class="text-xs text-slate-400">Authorized personnel view for hazard monitoring and status management</p>
+              <p class="text-xs text-slate-400">Live Firebase Cloud Synchronization Active</p>
             </div>
           </div>
           <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-medium">
-            Active Session
+            Authorized Cloud Access
           </span>
         </div>
 
@@ -241,7 +246,7 @@
               </tr>
             </thead>
             <tbody id="admin-table-body" class="divide-y divide-slate-800">
-              <!-- Dynamic Hazard Rows -->
+              <!-- Dynamic Real-Time Cloud Rows -->
             </tbody>
           </table>
         </div>
@@ -282,7 +287,7 @@
     </div>
   </div>
 
-  <!-- Script File -->
+  <!-- Deferred Custom Script Loading -->
   <script src="script.js" defer></script>
 </body>
 </html>
