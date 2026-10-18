@@ -5,16 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CityAlert - Community Hazard Reporting</title>
   
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  
-  <!-- Firebase JS App and Database SDK (v10.8.0) -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-  
-  <!-- Custom Stylesheet -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col">
@@ -23,7 +15,6 @@
   <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
     <div class="max-w-6xl mx-auto px-4 py-3.5 flex justify-between items-center">
       
-      <!-- Brand Logo -->
       <a href="#home" class="flex items-center space-x-2">
         <div class="bg-blue-600 text-white p-1.5 rounded-lg">
           <i data-lucide="shield-alert" class="w-5 h-5"></i>
@@ -38,15 +29,13 @@
         <a href="#my-reports" class="text-slate-600 hover:text-blue-600 transition">Live Reports</a>
         <a href="#report-form" class="text-slate-600 hover:text-blue-600 transition">Report Hazard</a>
 
-        <!-- PUBLIC MODE: Hidden Lock Icon for Admin Access -->
         <button id="public-admin-trigger" onclick="openLoginModal()" title="Administrator Login" class="text-slate-400 hover:text-slate-600 transition p-1.5 rounded-md hover:bg-slate-100">
           <i data-lucide="lock" class="w-4 h-4"></i>
         </button>
       </nav>
 
-      <!-- ADMIN NAVIGATION (Visible ONLY when logged in as Admin) -->
+      <!-- ADMIN NAVIGATION -->
       <nav id="admin-nav" class="hidden items-center space-x-6 text-sm font-medium">
-        <!-- ADMIN Notification Bell -->
         <div class="relative">
           <button id="notif-btn" onclick="toggleNotifications()" class="relative p-2 text-slate-600 hover:text-blue-600 focus:outline-none rounded-full hover:bg-slate-100 transition">
             <i data-lucide="bell" class="w-5 h-5"></i>
@@ -55,10 +44,9 @@
             </span>
           </button>
 
-          <!-- Notification Dropdown -->
           <div id="notif-dropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
             <div class="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-              <span class="font-bold text-xs text-slate-700 uppercase tracking-wider">Cloud Notifications</span>
+              <span class="font-bold text-xs text-slate-700 uppercase tracking-wider">Notifications</span>
               <button onclick="clearNotifications()" class="text-xs text-blue-600 hover:underline font-medium">Clear all</button>
             </div>
             <div id="notif-list" class="max-h-64 overflow-y-auto divide-y divide-slate-100">
@@ -81,10 +69,9 @@
   <!-- MAIN CONTAINER -->
   <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full space-y-8">
 
-    <!-- PUBLIC VIEW CONTAINER -->
+    <!-- PUBLIC VIEW -->
     <div id="public-view-container" class="space-y-8">
       
-      <!-- HERO BANNER -->
       <section id="home" class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm">
         <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2">
           Community Hazard Reporting and City Safety Monitoring Portal
@@ -97,7 +84,6 @@
         </a>
       </section>
 
-      <!-- SAFETY DASHBOARD STATS -->
       <section id="dashboard">
         <h2 class="text-lg font-bold text-slate-900 mb-4">Safety Dashboard</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -116,15 +102,14 @@
         </div>
       </section>
 
-      <!-- LIVE PUBLIC COMMUNITY FEED -->
       <section id="my-reports" class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
             <h2 class="text-lg font-bold text-slate-900">Live Community Hazard Feed</h2>
-            <p class="text-xs text-slate-500">Real-time status updates synced across all citizens and city departments</p>
+            <p class="text-xs text-slate-500">Real-time status updates synced from database</p>
           </div>
           <span id="user-report-count" class="text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-100">
-            0 Reports Active
+            0 Reports
           </span>
         </div>
 
@@ -140,13 +125,12 @@
               </tr>
             </thead>
             <tbody id="user-table-body" class="divide-y divide-slate-100">
-              <!-- Dynamic Rows Fetched Live from Firebase -->
+              <!-- MySQL Records Loaded Here -->
             </tbody>
           </table>
         </div>
       </section>
 
-      <!-- PUBLIC REPORT A HAZARD FORM -->
       <section id="report-form" class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm">
         <h2 class="text-xl font-bold text-slate-900 mb-6">Report a Hazard</h2>
 
@@ -154,12 +138,12 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label class="block text-xs font-semibold text-slate-700 mb-2">Your Name</label>
-              <input type="text" id="reporter-name" required placeholder="Enter your name" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+              <input type="text" id="reporter-name" required placeholder="Enter your name" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
             </div>
 
             <div>
               <label class="block text-xs font-semibold text-slate-700 mb-2">Hazard Category</label>
-              <select id="hazard-category" required class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white">
+              <select id="hazard-category" required class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 bg-white">
                 <option value="" disabled selected>Select category</option>
                 <option value="Road Damage / Pothole">Road Damage / Pothole</option>
                 <option value="Flooding">Flooding</option>
@@ -172,16 +156,16 @@
 
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-2">Location</label>
-            <input type="text" id="hazard-location" required placeholder="Enter hazard location (e.g., Street name, Landmark)" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            <input type="text" id="hazard-location" required placeholder="Enter hazard location (e.g., Street name, Landmark)" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
           </div>
 
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-2">Description</label>
-            <textarea id="hazard-desc" rows="4" required placeholder="Describe the hazard in detail..." class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
+            <textarea id="hazard-desc" rows="4" required placeholder="Describe the hazard in detail..." class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"></textarea>
           </div>
 
-          <button type="submit" id="submit-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm shadow-sm transition flex items-center gap-2">
-            <span>Submit Report</span>
+          <button type="submit" id="submit-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm shadow-sm transition">
+            Submit Report
           </button>
         </form>
       </section>
@@ -191,7 +175,6 @@
     <!-- EXCLUSIVE ADMINISTRATOR WORKSPACE -->
     <div id="admin-view-container" class="hidden space-y-8">
       
-      <!-- ADMIN HEADER & METRICS -->
       <section class="bg-slate-900 text-white rounded-xl p-6 shadow-md border border-slate-800 space-y-6">
         <div class="flex items-center justify-between border-b border-slate-800 pb-4">
           <div class="flex items-center gap-3">
@@ -200,15 +183,14 @@
             </div>
             <div>
               <h1 class="text-xl font-bold text-white">Administrator Command Center</h1>
-              <p class="text-xs text-slate-400">Live Firebase Cloud Synchronization Active</p>
+              <p class="text-xs text-slate-400">MySQL Server Backend Active</p>
             </div>
           </div>
           <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-medium">
-            Authorized Cloud Access
+            Authorized
           </span>
         </div>
 
-        <!-- ADMIN ANALYTICS CARDS -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div class="bg-slate-800/80 p-5 rounded-lg border border-slate-700">
             <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total System Reports</p>
@@ -225,7 +207,6 @@
         </div>
       </section>
 
-      <!-- ADMIN MANAGED HAZARDS TABLE -->
       <section class="bg-slate-900 text-white rounded-xl p-6 shadow-md border border-slate-800 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
           <h2 class="text-base font-bold text-white">Citizen Hazard Reports Database</h2>
@@ -246,7 +227,7 @@
               </tr>
             </thead>
             <tbody id="admin-table-body" class="divide-y divide-slate-800">
-              <!-- Dynamic Real-Time Cloud Rows -->
+              <!-- Admin Rows Loaded Here -->
             </tbody>
           </table>
         </div>
@@ -287,7 +268,6 @@
     </div>
   </div>
 
-  <!-- Deferred Custom Script Loading -->
   <script src="script.js" defer></script>
 </body>
 </html>
