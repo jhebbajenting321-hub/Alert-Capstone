@@ -1,90 +1,35 @@
-// ==========================================
-// FIREBASE CLOUD DATABASE CONFIGURATION
-// Configured with a live test database endpoint for instant GitHub Pages syncing
-// ==========================================
-const firebaseConfig = {
-  databaseURL: "https://cityalert-app-default-rtdb.asia-southeast1.firebasedatabase.app"
-};
-
-// Initialize Firebase App & Realtime Database instance
-let db = null;
-let reportsRef = null;
-
-try {
-  if (typeof firebase !== 'undefined') {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.database();
-    reportsRef = db.ref('reports');
-  }
-} catch (e) {
-  console.warn("Firebase initialization warning:", e);
-}
-
-// System State
+// System State & LocalStorage Persistence
 let isAdminLoggedIn = false;
 let notifications = [];
-let reportsMap = {}; 
-let initialLoadComplete = false;
 
-// DOM Ready Initialization
+const defaultReports = [
+  { id: 101, name: 'City Resident', category: 'Road Damage / Pothole', location: 'Main St. cor. 5th Ave', desc: 'Large pothole near crosswalk', status: 'Resolved', date: '10/18/2026' }
+];
+
+let reports = JSON.parse(localStorage.getItem('cityalert_reports')) || defaultReports;
+
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof lucide !== 'undefined') {
     lucide.createIcons();
   }
-
-  if (reportsRef) {
-    // Realtime Listener for Cloud Syncing across all devices
-    reportsRef.on('value', (snapshot) => {
-      const data = snapshot.val() || {};
-      
-      if (initialLoadComplete && isAdminLoggedIn) {
-        Object.keys(data).forEach(key => {
-          if (!reportsMap[key]) {
-            const newRep = data[key];
-            const newNotif = {
-              id: Date.now(),
-              message: `New report by ${newRep.name}: ${newRep.category}`,
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              read: false
-            };
-            notifications.unshift(newNotif);
-            renderNotifications();
-          }
-        });
-      }
-
-      reportsMap = data;
-      initialLoadComplete = true;
-
-      updateStats();
-      renderUserSubmissions();
-      if (isAdminLoggedIn) renderAdminTable();
-    }, (error) => {
-      console.error("Database Read Error:", error);
-    });
-  } else {
-    updateStats();
-    renderUserSubmissions();
-  }
+  updateStats();
+  renderUserSubmissions();
 });
 
-// Modal Controls
+function saveReports() {
+  localStorage.setItem('cityalert_reports', JSON.stringify(reports));
+}
+
+// Modal Control
 function openLoginModal() {
-  const modal = document.getElementById('login-modal');
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-  }
+  document.getElementById('login-modal').classList.remove('hidden');
+  document.getElementById('login-modal').classList.add('flex');
 }
 
 function closeLoginModal() {
-  const modal = document.getElementById('login-modal');
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-  }
-  const errorMsg = document.getElementById('login-error');
-  if (errorMsg) errorMsg.classList.add('hidden');
+  document.getElementById('login-modal').classList.add('hidden');
+  document.getElementById('login-modal').classList.remove('flex');
+  document.getElementById('login-error').classList.add('hidden');
 }
 
 // Admin Authentication (admin / admin123)
@@ -110,30 +55,20 @@ function toggleViewMode() {
   const adminView = document.getElementById('admin-view-container');
 
   if (isAdminLoggedIn) {
-    if (publicNav) publicNav.classList.add('hidden');
-    if (publicView) publicView.classList.add('hidden');
-
-    if (adminNav) {
-      adminNav.classList.remove('hidden');
-      adminNav.classList.add('flex');
-    }
-    if (adminView) adminView.classList.remove('hidden');
-
+    publicNav.classList.add('hidden');
+    publicView.classList.add('hidden');
+    adminNav.classList.remove('hidden');
+    adminNav.classList.add('flex');
+    adminView.classList.remove('hidden');
     renderAdminTable();
     updateStats();
   } else {
-    if (publicNav) publicNav.classList.remove('hidden');
-    if (publicView) publicView.classList.remove('hidden');
-
-    if (adminNav) {
-      adminNav.classList.add('hidden');
-      adminNav.classList.remove('flex');
-    }
-    if (adminView) adminView.classList.add('hidden');
-
-    const dropdown = document.getElementById('notif-dropdown');
-    if (dropdown) dropdown.classList.add('hidden');
-
+    publicNav.classList.remove('hidden');
+    publicView.classList.remove('hidden');
+    adminNav.classList.add('hidden');
+    adminNav.classList.remove('flex');
+    adminView.classList.add('hidden');
+    document.getElementById('notif-dropdown').classList.add('hidden');
     renderUserSubmissions();
     updateStats();
   }
@@ -144,15 +79,9 @@ function logoutAdmin() {
   toggleViewMode();
 }
 
-// Public Submission Handler (Writes directly to Cloud Database)
+// Form Submission Handler
 function handleFormSubmit(e) {
   e.preventDefault();
-
-  const submitBtn = document.getElementById('submit-btn');
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.innerText = 'Submitting...';
-  }
 
   const name = document.getElementById('reporter-name').value;
   const category = document.getElementById('hazard-category').value;
@@ -160,93 +89,74 @@ function handleFormSubmit(e) {
   const desc = document.getElementById('hazard-desc').value;
 
   const newReport = {
+    id: Date.now(),
     name,
     category,
     location,
     desc,
     status: 'Pending',
-    date: new Date().toLocaleDateString(),
-    timestamp: Date.now()
+    date: new Date().toLocaleDateString()
   };
 
-  if (reportsRef) {
-    reportsRef.push(newReport).then(() => {
-      document.getElementById('hazard-form').reset();
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.innerText = 'Submit Report';
-      }
-      alert('Thank you! Your hazard report has been successfully submitted.');
-    }).catch(err => {
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.innerText = 'Submit Report';
-      }
-      alert('Submission error: ' + err.message);
-    });
-  } else {
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.innerText = 'Submit Report';
-    }
-    alert('Database connection not established.');
+  reports.unshift(newReport);
+  saveReports();
+
+  // Create Notification for Admin
+  const newNotif = {
+    id: Date.now(),
+    message: `New report by ${name}: ${category}`,
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    read: false
+  };
+  notifications.unshift(newNotif);
+
+  document.getElementById('hazard-form').reset();
+  updateStats();
+  renderUserSubmissions();
+  renderNotifications();
+  if (isAdminLoggedIn) renderAdminTable();
+
+  alert('Thank you! Your hazard report has been successfully submitted.');
+}
+
+// Update Stats
+function updateStats() {
+  const total = reports.length;
+  const pending = reports.filter(r => r.status === 'Pending').length;
+  const resolved = reports.filter(r => r.status === 'Resolved').length;
+
+  document.getElementById('stat-total').innerText = total;
+  document.getElementById('stat-pending').innerText = pending;
+  document.getElementById('stat-resolved').innerText = resolved;
+
+  const adminTotal = document.getElementById('admin-stat-total');
+  if (adminTotal) {
+    adminTotal.innerText = total;
+    document.getElementById('admin-stat-pending').innerText = pending;
+    document.getElementById('admin-stat-resolved').innerText = resolved;
   }
 }
 
-// Convert Map Object to Sorted Array
-function getReportsArray() {
-  return Object.keys(reportsMap).map(key => ({
-    key,
-    ...reportsMap[key]
-  })).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-}
-
-// Update Dashboard Counters
-function updateStats() {
-  const reportsList = getReportsArray();
-  const total = reportsList.length;
-  const pending = reportsList.filter(r => r.status === 'Pending').length;
-  const resolved = reportsList.filter(r => r.status === 'Resolved').length;
-
-  const totalEl = document.getElementById('stat-total');
-  const pendingEl = document.getElementById('stat-pending');
-  const resolvedEl = document.getElementById('stat-resolved');
-
-  if (totalEl) totalEl.innerText = total;
-  if (pendingEl) pendingEl.innerText = pending;
-  if (resolvedEl) resolvedEl.innerText = resolved;
-
-  const adminTotalEl = document.getElementById('admin-stat-total');
-  const adminPendingEl = document.getElementById('admin-stat-pending');
-  const adminResolvedEl = document.getElementById('admin-stat-resolved');
-
-  if (adminTotalEl) adminTotalEl.innerText = total;
-  if (adminPendingEl) adminPendingEl.innerText = pending;
-  if (adminResolvedEl) adminResolvedEl.innerText = resolved;
-}
-
-// Render Public Live Feed
+// Render Public Table
 function renderUserSubmissions() {
   const tbody = document.getElementById('user-table-body');
   const countBadge = document.getElementById('user-report-count');
-  const reportsList = getReportsArray();
 
   if (!tbody) return;
 
-  if (reportsList.length === 0) {
+  countBadge.innerText = `${reports.length} Reports`;
+
+  if (reports.length === 0) {
     tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">No active hazard reports submitted yet.</td></tr>`;
-    if (countBadge) countBadge.innerText = '0 Reports Active';
     return;
   }
 
-  if (countBadge) countBadge.innerText = `${reportsList.length} Reports Active`;
-
-  tbody.innerHTML = reportsList.map(r => `
+  tbody.innerHTML = reports.map(r => `
     <tr class="hover:bg-slate-50/80 transition">
       <td class="p-3 font-semibold text-slate-800">${r.category}</td>
       <td class="p-3">${r.location}</td>
       <td class="p-3 text-slate-500 max-w-xs truncate">${r.desc}</td>
-      <td class="p-3 text-slate-400">${r.date || 'Today'}</td>
+      <td class="p-3 text-slate-400">${r.date}</td>
       <td class="p-3 text-right">
         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
           r.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
@@ -259,25 +169,23 @@ function renderUserSubmissions() {
   `).join('');
 }
 
-// Render Administrator Database Table
+// Render Admin Table
 function renderAdminTable() {
   const tbody = document.getElementById('admin-table-body');
-  const reportsList = getReportsArray();
-
   if (!tbody) return;
 
-  if (reportsList.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No reports in cloud database.</td></tr>`;
+  if (reports.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No reports in database.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = reportsList.map(r => `
+  tbody.innerHTML = reports.map(r => `
     <tr class="hover:bg-slate-800/50 transition">
       <td class="p-3 font-semibold text-white">${r.name}</td>
       <td class="p-3 text-slate-300">${r.category}</td>
       <td class="p-3 text-slate-300">${r.location}</td>
       <td class="p-3 text-slate-400 max-w-xs truncate">${r.desc}</td>
-      <td class="p-3 text-slate-400">${r.date || 'Today'}</td>
+      <td class="p-3 text-slate-400">${r.date}</td>
       <td class="p-3">
         <span class="px-2 py-0.5 text-[10px] rounded-full font-semibold ${
           r.status === 'Resolved' ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700' : 'bg-amber-900/60 text-amber-300 border border-amber-700'
@@ -287,11 +195,11 @@ function renderAdminTable() {
       </td>
       <td class="p-3 text-right space-x-1.5">
         ${r.status === 'Pending' ? `
-          <button onclick="resolveReport('${r.key}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
+          <button onclick="resolveReport(${r.id})" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
             Resolve
           </button>
         ` : ''}
-        <button onclick="deleteReport('${r.key}')" class="bg-red-600/80 hover:bg-red-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
+        <button onclick="deleteReport(${r.id})" class="bg-red-600/80 hover:bg-red-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
           Delete
         </button>
       </td>
@@ -299,21 +207,24 @@ function renderAdminTable() {
   `).join('');
 }
 
-// Resolve Report in Cloud
-function resolveReport(key) {
-  if (reportsRef && key) {
-    reportsRef.child(key).update({ status: 'Resolved' });
+function resolveReport(id) {
+  const report = reports.find(r => r.id === id);
+  if (report) {
+    report.status = 'Resolved';
+    saveReports();
+    updateStats();
+    renderAdminTable();
   }
 }
 
-// Delete Report from Cloud
-function deleteReport(key) {
-  if (reportsRef && key) {
-    reportsRef.child(key).remove();
-  }
+function deleteReport(id) {
+  reports = reports.filter(r => r.id !== id);
+  saveReports();
+  updateStats();
+  renderAdminTable();
 }
 
-// Notifications Logic
+// Notifications
 function toggleNotifications() {
   const dropdown = document.getElementById('notif-dropdown');
   if (dropdown) {
