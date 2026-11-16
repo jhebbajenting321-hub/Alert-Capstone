@@ -9,6 +9,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Leaflet.js CSS & JS (Interactive Map API) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
   <!-- Firebase SDK (v10 Compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -35,11 +38,11 @@
       </a>
 
       <!-- PUBLIC NAVIGATION -->
-      <nav id="public-nav" class="flex items-center space-x-6 text-sm font-medium">
-        <a href="#home" class="text-slate-600 hover:text-blue-600 transition">Home</a>
-        <a href="#dashboard" class="text-slate-600 hover:text-blue-600 transition">Dashboard</a>
-        <a href="#my-reports" class="text-slate-600 hover:text-blue-600 transition">Live Feed</a>
-        <a href="#report-form" class="text-slate-600 hover:text-blue-600 transition">Report Hazard</a>
+      <nav id="public-nav" class="flex items-center space-x-4 md:space-x-6 text-sm font-medium">
+        <a href="#home" class="hidden sm:inline text-slate-600 hover:text-blue-600 transition">Home</a>
+        <a href="#dashboard" class="hidden sm:inline text-slate-600 hover:text-blue-600 transition">Dashboard</a>
+        <a href="#live-map-section" class="text-slate-600 hover:text-blue-600 transition">Map & Feed</a>
+        <a href="#report-form" class="text-slate-600 hover:text-blue-600 transition">Report</a>
 
         <button id="public-admin-trigger" onclick="openLoginModal()" title="Administrator Login" class="text-slate-400 hover:text-slate-600 transition p-1.5 rounded-md hover:bg-slate-100">
           <i data-lucide="lock" class="w-4 h-4"></i>
@@ -47,7 +50,7 @@
       </nav>
 
       <!-- ADMIN NAVIGATION -->
-      <nav id="admin-nav" class="hidden items-center space-x-6 text-sm font-medium">
+      <nav id="admin-nav" class="hidden items-center space-x-4 md:space-x-6 text-sm font-medium">
         <div class="relative">
           <button id="notif-btn" onclick="toggleNotifications()" class="relative p-2 text-slate-600 hover:text-blue-600 focus:outline-none rounded-full hover:bg-slate-100 transition">
             <i data-lucide="bell" class="w-5 h-5"></i>
@@ -68,7 +71,7 @@
         </div>
 
         <span class="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-full border border-amber-200 flex items-center gap-1">
-          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-amber-600"></i> GenSan Admin Mode
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-amber-600"></i> <span class="hidden sm:inline">GenSan Admin Mode</span>
         </span>
         <button onclick="logoutAdmin()" class="text-xs font-semibold text-slate-500 hover:text-red-600 transition flex items-center gap-1">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Logout
@@ -95,11 +98,16 @@
           CityAlert: General Santos City Community Hazard Reporting & Safety Portal
         </h1>
         <p class="text-slate-600 text-sm max-w-2xl mb-6">
-          Help keep General Santos City safe by reporting road damage, flooding, fallen debris, and public safety hazards in your barangay directly to city monitoring teams.
+          Help keep General Santos City safe by reporting road damage, flooding, fallen debris, and public safety hazards with photo evidence and GPS location tagging directly to city monitoring teams.
         </p>
-        <a href="#report-form" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm text-sm transition">
-          Report a Hazard in GenSan
-        </a>
+        <div class="flex flex-wrap gap-3">
+          <a href="#report-form" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm text-sm transition">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i> Report a Hazard in GenSan
+          </a>
+          <a href="#live-map-section" class="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-5 py-2.5 rounded-lg text-sm transition">
+            <i data-lucide="map-pin" class="w-4 h-4 text-blue-600"></i> View Live Hazard Map
+          </a>
+        </div>
       </section>
 
       <!-- SAFETY DASHBOARD STATS -->
@@ -121,22 +129,47 @@
         </div>
       </section>
 
+      <!-- INTERACTIVE GIS HAZARD MAP -->
+      <section id="live-map-section" class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="map" class="w-5 h-5 text-blue-600"></i> GenSan Live GIS Hazard Map
+            </h2>
+            <p class="text-xs text-slate-500">Interactive OpenStreetMap view plotting active and resolved hazards across General Santos City</p>
+          </div>
+          <div class="flex items-center gap-3 text-xs font-medium">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Pending</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Resolved</span>
+          </div>
+        </div>
+        <div id="public-map" class="w-full h-80 md:h-96 rounded-lg border border-slate-200 z-10"></div>
+      </section>
+
       <!-- LIVE COMMUNITY FEED -->
       <section id="my-reports" class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
             <h2 class="text-lg font-bold text-slate-900">Live GenSan Community Hazard Feed</h2>
             <p class="text-xs text-slate-500">Real-time status updates synced live across General Santos City barangays</p>
           </div>
-          <span id="user-report-count" class="text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-100">
-            0 Active Reports
-          </span>
+          <div class="flex items-center gap-2">
+            <select id="feed-status-filter" onchange="renderUserSubmissions()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:border-blue-500">
+              <option value="ALL">All Statuses</option>
+              <option value="Pending">Pending Only</option>
+              <option value="Resolved">Resolved Only</option>
+            </select>
+            <span id="user-report-count" class="text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-lg border border-blue-100">
+              0 Reports
+            </span>
+          </div>
         </div>
 
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs text-slate-600">
             <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-100">
               <tr>
+                <th class="p-3">Photo</th>
                 <th class="p-3">Category</th>
                 <th class="p-3">Barangay / Location</th>
                 <th class="p-3">Hazard Description</th>
@@ -154,7 +187,7 @@
       <!-- REPORT A HAZARD FORM -->
       <section id="report-form" class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm">
         <h2 class="text-xl font-bold text-slate-900 mb-1">Report a Hazard in GenSan</h2>
-        <p class="text-xs text-slate-500 mb-6">Submit details to alert local authorities and fellow Generals.</p>
+        <p class="text-xs text-slate-500 mb-6">Submit photo evidence, pin exact location on the map, and alert local authorities.</p>
 
         <form id="hazard-form" onsubmit="handleFormSubmit(event)" class="space-y-5">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -177,14 +210,86 @@
             </div>
           </div>
 
+          <!-- Barangay & Landmark -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-2">Barangay</label>
+              <select id="hazard-barangay" required class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 bg-white">
+                <option value="" disabled selected>Select Barangay in GenSan</option>
+                <option value="Apopong">Apopong</option>
+                <option value="Baluan">Baluan</option>
+                <option value="Batomelong">Batomelong</option>
+                <option value="Buayan">Buayan</option>
+                <option value="Bula">Bula</option>
+                <option value="Calumpang">Calumpang</option>
+                <option value="City Heights">City Heights</option>
+                <option value="Conel">Conel</option>
+                <option value="Dadiangas East">Dadiangas East</option>
+                <option value="Dadiangas North">Dadiangas North</option>
+                <option value="Dadiangas South">Dadiangas South</option>
+                <option value="Dadiangas West">Dadiangas West</option>
+                <option value="Fatima">Fatima</option>
+                <option value="Katangawan">Katangawan</option>
+                <option value="Labangal">Labangal</option>
+                <option value="Lagao">Lagao</option>
+                <option value="Ligaya">Ligaya</option>
+                <option value="Mabuhay">Mabuhay</option>
+                <option value="Olympog">Olympog</option>
+                <option value="San Isidro">San Isidro</option>
+                <option value="San Jose">San Jose</option>
+                <option value="Siguel">Siguel</option>
+                <option value="Sinawal">Sinawal</option>
+                <option value="Tambler">Tambler</option>
+                <option value="Tinagacan">Tinagacan</option>
+                <option value="Upper Labay">Upper Labay</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-2">Specific Street / Landmark</label>
+              <input type="text" id="hazard-location" required placeholder="e.g. National Highway near Oval Plaza" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
+            </div>
+          </div>
+
+          <!-- GPS / Interactive Location Picker -->
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <label class="block text-xs font-bold text-slate-700">Pin Exact Location on Map (Optional / Recommended)</label>
+                <p class="text-[11px] text-slate-500">Click anywhere on the map below or use your device GPS to tag coordinates.</p>
+              </div>
+              <button type="button" onclick="detectUserGPS()" class="inline-flex items-center gap-1.5 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition">
+                <i data-lucide="crosshair" class="w-3.5 h-3.5"></i> Use My Current GPS
+              </button>
+            </div>
+            <div id="picker-map" class="w-full h-56 rounded-lg border border-slate-300 z-10"></div>
+            <div class="flex items-center gap-4 text-[11px] text-slate-500">
+              <span>Latitude: <strong id="display-lat" class="text-slate-700">6.1164</strong></span>
+              <span>Longitude: <strong id="display-lng" class="text-slate-700">125.1716</strong></span>
+              <input type="hidden" id="hazard-lat" value="6.1164">
+              <input type="hidden" id="hazard-lng" value="125.1716">
+            </div>
+          </div>
+
+          <!-- Photo Upload Evidence -->
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-2">Location / Barangay</label>
-            <input type="text" id="hazard-location" required placeholder="e.g. Lagao Highway, Calumpang, National Highway near Oval Plaza" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
+            <label class="block text-xs font-semibold text-slate-700 mb-2">Photo Evidence (Optional)</label>
+            <div class="flex items-center gap-4">
+              <label class="flex items-center gap-2 cursor-pointer bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-300 px-4 py-2.5 rounded-lg text-xs font-medium text-slate-700 transition">
+                <i data-lucide="camera" class="w-4 h-4 text-blue-600"></i>
+                <span>Upload or Capture Photo</span>
+                <input type="file" id="hazard-photo" accept="image/*" capture="environment" onchange="previewPhoto(event)" class="hidden">
+              </label>
+              <button type="button" id="remove-photo-btn" onclick="clearPhoto()" class="hidden text-xs text-red-500 hover:underline">Remove</button>
+            </div>
+            <div id="photo-preview-container" class="hidden mt-3">
+              <img id="photo-preview" src="" alt="Hazard Preview" class="h-32 w-auto rounded-lg border border-slate-200 object-cover shadow-sm">
+            </div>
           </div>
 
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-2">Hazard Description</label>
-            <textarea id="hazard-desc" rows="4" required placeholder="Provide specific details about the hazard (e.g. deep pothole near the intersection obstructing traffic)..." class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"></textarea>
+            <textarea id="hazard-desc" rows="3" required placeholder="Provide specific details about the hazard (e.g. deep pothole near the intersection obstructing traffic)..." class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"></textarea>
           </div>
 
           <button type="submit" id="submit-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm shadow-sm transition">
@@ -233,13 +338,14 @@
       <section class="bg-slate-900 text-white rounded-xl p-6 shadow-md border border-slate-800 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
           <h2 class="text-base font-bold text-white">Citizen Hazard Reports Database</h2>
-          <span class="text-xs text-slate-400">Real-time status controls</span>
+          <span class="text-xs text-slate-400">Real-time status & photo verification</span>
         </div>
         
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs text-slate-300">
             <thead class="bg-slate-800 text-slate-400 uppercase font-semibold">
               <tr>
+                <th class="p-3">Photo</th>
                 <th class="p-3">Reporter</th>
                 <th class="p-3">Category</th>
                 <th class="p-3">Barangay / Location</th>
@@ -259,6 +365,16 @@
     </div>
 
   </main>
+
+  <!-- PHOTO LIGHTBOX MODAL -->
+  <div id="image-modal" onclick="closeImageModal()" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="relative max-w-2xl w-full bg-white rounded-xl p-2 shadow-2xl" onclick="event.stopPropagation()">
+      <button onclick="closeImageModal()" class="absolute -top-3 -right-3 bg-slate-900 text-white rounded-full p-1.5 shadow-md hover:bg-slate-700">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+      <img id="modal-full-img" src="" alt="Full Hazard Evidence" class="w-full max-h-[80vh] object-contain rounded-lg">
+    </div>
+  </div>
 
   <!-- ADMIN LOGIN MODAL -->
   <div id="login-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 px-4">

@@ -31,11 +31,21 @@ let isAdminLoggedIn = false;
 let notifications = [];
 let reportsMap = {};
 let initialLoadComplete = false;
+let currentPhotoBase64 = "";
+
+// Leaflet Map Instances (Centered on General Santos City)
+const GENSAN_COORDS = [6.1164, 125.1716];
+let publicMap = null;
+let publicMarkersLayer = null;
+let pickerMap = null;
+let pickerMarker = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof lucide !== 'undefined') {
     lucide.createIcons();
   }
+
+  initMaps();
 
   if (reportsRef) {
     // Realtime Listener for Cross-Device Cloud Syncing
@@ -48,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const newRep = data[key];
             const newNotif = {
               id: Date.now(),
-              message: `New report in ${newRep.location}: ${newRep.category}`,
+              message: `New report in Brgy. ${newRep.barangay || 'GenSan'} (${newRep.location}): ${newRep.category}`,
               time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               read: false
             };
@@ -63,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       updateStats();
       renderUserSubmissions();
+      updatePublicMapMarkers();
       if (isAdminLoggedIn) renderAdminTable();
     });
   } else {
@@ -71,7 +82,162 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// Modal Control
+// ==========================================
+// LEAFLET GIS MAP INTEGRATION
+// ==========================================
+function initMaps() {
+  if (typeof L === 'undefined') return;
+
+  // 1. Live Public Hazard Map
+  const publicMapEl = document.getElementById('public-map');
+  if (publicMapEl) {
+    publicMap = L.map('public-map').setView(GENSAN_COORDS, 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors | CityAlert GenSan'
+    }).addTo(publicMap);
+    publicMarkersLayer = L.layerGroup().addTo(publicMap);
+  }
+
+  // 2. Form Coordinate Picker Map
+  const pickerMapEl = document.getElementById('picker-map');
+  if (pickerMapEl) {
+    pickerMap = L.map('picker-map').setView(GENSAN_COORDS, 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(pickerMap);
+
+    pickerMarker = L.marker(GENSAN_COORDS, { draggable: true }).addTo(pickerMap);
+
+    pickerMarker.on('dragend', function (e) {
+      const pos = e.target.getLatLng();
+      setPickerCoordinates(pos.lat, pos.lng);
+    });
+
+    pickerMap.on('click', function (e) {
+      pickerMarker.setLatLng(e.latlng);
+      setPickerCoordinates(e.latlng.lat, e.latlng.lng);
+    });
+  }
+}
+
+function setPickerCoordinates(lat, lng) {
+  const fixedLat = lat.toFixed(6);
+  const fixedLng = lng.toFixed(6);
+  document.getElementById('hazard-lat').value = fixedLat;
+  document.getElementById('hazard-lng').value = fixedLng;
+  document.getElementById('display-lat').innerText = fixedLat;
+  document.getElementById('display-lng').innerText = fixedLng;
+}
+
+function detectUserGPS() {
+  if (!navigator.geolocation) {
+    alert("Geolocation is not supported by your browser.");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const { latitude, longitude } = position.coords;
+      setPickerCoordinates(latitude, longitude);
+      if (pickerMap && pickerMarker) {
+        pickerMap.setView([latitude, longitude], 16);
+        pickerMarker.setLatLng([latitude, longitude]);
+      }
+    },
+    () => {
+      alert("Unable to retrieve GPS location. You can click directly on the map to pin the hazard.");
+    }
+  );
+}
+
+function updatePublicMapMarkers() {
+  if (!publicMap || !publicMarkersLayer) return;
+  publicMarkersLayer.clearLayers();
+
+  const reportsList = getReportsArray();
+  reportsList.forEach(r => {
+    const lat = parseFloat(r.lat);
+    const lng = parseFloat(r.lng);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      const markerColor = r.status === 'Resolved' ? '#10b981' : '#f59e0b';
+      const customIcon = L.divIcon({
+        className: 'custom-pin',
+        html: `<div style="background-color:${markerColor}; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.4);"></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      });
+
+      const popupContent = `
+        <div class="text-xs space-y-1 max-w-[200px]">
+          <p class="font-bold text-slate-900">${r.category}</p>
+          <p class="text-blue-600 font-medium">Brgy. ${r.barangay || 'GenSan'} - ${r.location}</p>
+          <p class="text-slate-600">${r.desc}</p>
+          ${r.photo ? `<img src="${r.photo}" class="w-full h-20 object-cover rounded mt-1 border" />` : ''}
+          <p class="pt-1 font-semibold ${r.status === 'Resolved' ? 'text-emerald-600' : 'text-amber-600'}">Status: ${r.status}</p>
+        </div>
+      `;
+
+      L.marker([lat, lng], { icon: customIcon })
+        .bindPopup(popupContent)
+        .addTo(publicMarkersLayer);
+    }
+  });
+}
+
+// ==========================================
+// PHOTO UPLOAD & COMPRESSION HANDLER
+// ==========================================
+function previewPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const img = new Image();
+    img.onload = function () {
+      // Compress image via canvas so it stores cleanly in Firebase RTDB
+      const canvas = document.createElement('canvas');
+      const MAX_WIDTH = 600;
+      const scaleSize = MAX_WIDTH / img.width;
+      canvas.width = img.width > MAX_WIDTH ? MAX_WIDTH : img.width;
+      canvas.height = img.width > MAX_WIDTH ? img.height * scaleSize : img.height;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      currentPhotoBase64 = canvas.toDataURL('image/jpeg', 0.7);
+
+      document.getElementById('photo-preview').src = currentPhotoBase64;
+      document.getElementById('photo-preview-container').classList.remove('hidden');
+      document.getElementById('remove-photo-btn').classList.remove('hidden');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearPhoto() {
+  currentPhotoBase64 = "";
+  document.getElementById('hazard-photo').value = "";
+  document.getElementById('photo-preview').src = "";
+  document.getElementById('photo-preview-container').classList.add('hidden');
+  document.getElementById('remove-photo-btn').classList.add('hidden');
+}
+
+function openImageModal(src) {
+  if (!src) return;
+  document.getElementById('modal-full-img').src = src;
+  document.getElementById('image-modal').classList.remove('hidden');
+  document.getElementById('image-modal').classList.add('flex');
+}
+
+function closeImageModal() {
+  document.getElementById('image-modal').classList.add('hidden');
+  document.getElementById('image-modal').classList.remove('flex');
+}
+
+// ==========================================
+// MODAL & ADMIN AUTHENTICATION
+// ==========================================
 function openLoginModal() {
   document.getElementById('login-modal').classList.remove('hidden');
   document.getElementById('login-modal').classList.add('flex');
@@ -83,7 +249,6 @@ function closeLoginModal() {
   document.getElementById('login-error').classList.add('hidden');
 }
 
-// Admin Authentication (admin / admin123)
 function handleAdminLogin(e) {
   e.preventDefault();
   const user = document.getElementById('admin-user').value;
@@ -98,7 +263,6 @@ function handleAdminLogin(e) {
   }
 }
 
-// Toggle View Modes
 function toggleViewMode() {
   const publicNav = document.getElementById('public-nav');
   const adminNav = document.getElementById('admin-nav');
@@ -122,6 +286,7 @@ function toggleViewMode() {
     document.getElementById('notif-dropdown').classList.add('hidden');
     renderUserSubmissions();
     updateStats();
+    if (publicMap) setTimeout(() => publicMap.invalidateSize(), 200);
   }
 }
 
@@ -130,7 +295,9 @@ function logoutAdmin() {
   toggleViewMode();
 }
 
-// Public Submission Handler (Writes to Firebase Cloud)
+// ==========================================
+// PUBLIC SUBMISSION HANDLER
+// ==========================================
 function handleFormSubmit(e) {
   e.preventDefault();
 
@@ -140,14 +307,21 @@ function handleFormSubmit(e) {
 
   const name = document.getElementById('reporter-name').value;
   const category = document.getElementById('hazard-category').value;
+  const barangay = document.getElementById('hazard-barangay').value;
   const location = document.getElementById('hazard-location').value;
   const desc = document.getElementById('hazard-desc').value;
+  const lat = document.getElementById('hazard-lat').value;
+  const lng = document.getElementById('hazard-lng').value;
 
   const newReport = {
     name,
     category,
+    barangay,
     location,
     desc,
+    lat,
+    lng,
+    photo: currentPhotoBase64 || null,
     status: 'Pending',
     date: new Date().toLocaleDateString(),
     timestamp: Date.now()
@@ -156,6 +330,12 @@ function handleFormSubmit(e) {
   if (reportsRef) {
     reportsRef.push(newReport).then(() => {
       document.getElementById('hazard-form').reset();
+      clearPhoto();
+      setPickerCoordinates(GENSAN_COORDS[0], GENSAN_COORDS[1]);
+      if (pickerMap && pickerMarker) {
+        pickerMap.setView(GENSAN_COORDS, 14);
+        pickerMarker.setLatLng(GENSAN_COORDS);
+      }
       submitBtn.disabled = false;
       submitBtn.innerText = 'Submit Hazard Report';
       alert('Salamat! Your report has been submitted to General Santos City safety monitor.');
@@ -171,7 +351,9 @@ function handleFormSubmit(e) {
   }
 }
 
-// Convert Map to Sorted Array
+// ==========================================
+// DATA RENDERING & DASHBOARD UPDATES
+// ==========================================
 function getReportsArray() {
   return Object.keys(reportsMap).map(key => ({
     key,
@@ -179,7 +361,6 @@ function getReportsArray() {
   })).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 }
 
-// Update Dashboard Counters
 function updateStats() {
   const reportsList = getReportsArray();
   const total = reportsList.length;
@@ -198,26 +379,39 @@ function updateStats() {
   }
 }
 
-// Render Public Live Feed
 function renderUserSubmissions() {
   const tbody = document.getElementById('user-table-body');
   const countBadge = document.getElementById('user-report-count');
-  const reportsList = getReportsArray();
+  const filterVal = document.getElementById('feed-status-filter')?.value || 'ALL';
+  
+  let reportsList = getReportsArray();
+  if (filterVal !== 'ALL') {
+    reportsList = reportsList.filter(r => r.status === filterVal);
+  }
 
   if (!tbody) return;
 
-  countBadge.innerText = `${reportsList.length} Active Reports`;
+  countBadge.innerText = `${reportsList.length} Reports`;
 
   if (reportsList.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">No active hazard reports submitted in General Santos City yet.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">No hazard reports matching the current filter in General Santos City.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = reportsList.map(r => `
     <tr class="hover:bg-slate-50/80 transition">
+      <td class="p-3">
+        ${r.photo 
+          ? `<img src="${r.photo}" onclick="openImageModal('${r.photo}')" alt="Hazard" class="w-10 h-10 object-cover rounded-md border border-slate-200 cursor-pointer hover:opacity-80 transition">`
+          : `<div class="w-10 h-10 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-[10px]">No img</div>`
+        }
+      </td>
       <td class="p-3 font-semibold text-slate-800">${r.category}</td>
-      <td class="p-3 font-medium text-blue-700">${r.location}</td>
-      <td class="p-3 text-slate-500 max-w-xs truncate">${r.desc}</td>
+      <td class="p-3">
+        <span class="block font-bold text-blue-700">${r.barangay ? `Brgy. ${r.barangay}` : 'General Santos'}</span>
+        <span class="text-slate-500 text-[11px]">${r.location}</span>
+      </td>
+      <td class="p-3 text-slate-500 max-w-xs truncate" title="${r.desc}">${r.desc}</td>
       <td class="p-3 text-slate-400">${r.date || 'Today'}</td>
       <td class="p-3 text-right">
         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
@@ -231,7 +425,6 @@ function renderUserSubmissions() {
   `).join('');
 }
 
-// Render Admin Table
 function renderAdminTable() {
   const tbody = document.getElementById('admin-table-body');
   const reportsList = getReportsArray();
@@ -239,16 +432,25 @@ function renderAdminTable() {
   if (!tbody) return;
 
   if (reportsList.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No reports in cloud database.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-500">No reports in cloud database.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = reportsList.map(r => `
     <tr class="hover:bg-slate-800/50 transition">
+      <td class="p-3">
+        ${r.photo 
+          ? `<img src="${r.photo}" onclick="openImageModal('${r.photo}')" alt="Hazard" class="w-10 h-10 object-cover rounded-md border border-slate-700 cursor-pointer hover:opacity-80 transition">`
+          : `<div class="w-10 h-10 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500 text-[10px]">None</div>`
+        }
+      </td>
       <td class="p-3 font-semibold text-white">${r.name}</td>
       <td class="p-3 text-slate-300">${r.category}</td>
-      <td class="p-3 text-blue-400 font-medium">${r.location}</td>
-      <td class="p-3 text-slate-400 max-w-xs truncate">${r.desc}</td>
+      <td class="p-3">
+        <span class="block text-blue-400 font-semibold">${r.barangay ? `Brgy. ${r.barangay}` : 'GenSan'}</span>
+        <span class="text-slate-400 text-[11px]">${r.location}</span>
+      </td>
+      <td class="p-3 text-slate-400 max-w-xs truncate" title="${r.desc}">${r.desc}</td>
       <td class="p-3 text-slate-400">${r.date || 'Today'}</td>
       <td class="p-3">
         <span class="px-2 py-0.5 text-[10px] rounded-full font-semibold ${
@@ -257,7 +459,7 @@ function renderAdminTable() {
           ${r.status}
         </span>
       </td>
-      <td class="p-3 text-right space-x-1.5">
+      <td class="p-3 text-right space-x-1.5 whitespace-nowrap">
         ${r.status === 'Pending' ? `
           <button onclick="resolveReport('${r.key}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
             Resolve
@@ -283,7 +485,9 @@ function deleteReport(key) {
   }
 }
 
-// Notifications
+// ==========================================
+// NOTIFICATIONS
+// ==========================================
 function toggleNotifications() {
   const dropdown = document.getElementById('notif-dropdown');
   if (dropdown) {
