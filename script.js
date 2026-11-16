@@ -79,11 +79,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================
-// LEAFLET GIS MAPS
+// LEAFLET GIS MAPS & AUTOMATIC GPS DETECTION
 // ==========================================
 function initMaps() {
   if (typeof L === 'undefined') return;
 
+  // 1. Public Hazard Map
   const publicMapEl = document.getElementById('public-map');
   if (publicMapEl) {
     publicMap = L.map('public-map').setView(GENSAN_COORDS, 13);
@@ -93,6 +94,7 @@ function initMaps() {
     publicMarkersLayer = L.layerGroup().addTo(publicMap);
   }
 
+  // 2. Form Location Picker Map (Initialized with GenSan defaults first)
   const pickerMapEl = document.getElementById('picker-map');
   if (pickerMapEl) {
     pickerMap = L.map('picker-map').setView(GENSAN_COORDS, 14);
@@ -111,6 +113,9 @@ function initMaps() {
       pickerMarker.setLatLng(e.latlng);
       setPickerCoordinates(e.latlng.lat, e.latlng.lng);
     });
+
+    // Automatically trigger browser geolocation on load
+    autoDetectGPS(false);
   }
 }
 
@@ -123,9 +128,9 @@ function setPickerCoordinates(lat, lng) {
   document.getElementById('display-lng').innerText = fixedLng;
 }
 
-function detectUserGPS() {
+function autoDetectGPS(showAlerts = false) {
   if (!navigator.geolocation) {
-    alert("Geolocation is not supported by your browser.");
+    if (showAlerts) alert("Geolocation is not supported by your browser.");
     return;
   }
 
@@ -137,10 +142,14 @@ function detectUserGPS() {
         pickerMap.setView([latitude, longitude], 16);
         pickerMarker.setLatLng([latitude, longitude]);
       }
+      if (showAlerts) alert("GPS location successfully updated to your current spot!");
     },
     () => {
-      alert("Unable to retrieve GPS location. Please click directly on the map.");
-    }
+      if (showAlerts) {
+        alert("Unable to retrieve GPS location. Defaulting to General Santos City center.");
+      }
+    },
+    { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
   );
 }
 
@@ -340,14 +349,10 @@ function handleFormSubmit(e) {
     reportsRef.push(newReport).then(() => {
       document.getElementById('hazard-form').reset();
       clearPhoto();
-      setPickerCoordinates(GENSAN_COORDS[0], GENSAN_COORDS[1]);
-      if (pickerMap && pickerMarker) {
-        pickerMap.setView(GENSAN_COORDS, 14);
-        pickerMarker.setLatLng(GENSAN_COORDS);
-      }
+      autoDetectGPS(false);
       submitBtn.disabled = false;
       submitBtn.innerText = 'Submit Hazard Report';
-      alert('Salamat! Your report has been submitted to General Santos City safety monitor.');
+      alert('Salamat! Your report has been submitted with your exact GPS location.');
     }).catch(err => {
       submitBtn.disabled = false;
       submitBtn.innerText = 'Submit Hazard Report';
