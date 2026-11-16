@@ -25,7 +25,6 @@ try {
   console.warn("Firebase initialization error:", e);
 }
 
-// Role State: 'public', 'admin', or 'sysadmin'
 let currentRole = 'public';
 let notifications = [];
 let reportsMap = {};
@@ -166,9 +165,9 @@ function updatePublicMapMarkers() {
         <div class="text-xs space-y-1 max-w-[200px]">
           <p class="font-bold text-slate-900">${r.category}</p>
           <p class="text-blue-600 font-medium">Brgy. ${r.barangay || 'GenSan'} - ${r.location}</p>
-          <p class="text-slate-600">${r.desc}</p>
+          <p class="text-slate-600">Lat: ${lat}, Lng: ${lng}</p>
           ${r.photo ? `<img src="${r.photo}" class="w-full h-20 object-cover rounded mt-1 border" />` : ''}
-          <p class="pt-1 font-semibold ${r.status === 'Resolved' ? 'text-emerald-600' : 'text-amber-600'}">Status: ${r.status}</p>
+          <p class="pt-1 font-semibold ${r.status === 'Resolved' ? 'text-emerald-600' : 'text-amber-600'}">Status: ${r.status === 'Resolved' ? 'Done' : r.status}</p>
         </div>
       `;
 
@@ -249,11 +248,11 @@ function handleLogin(e) {
   const pass = document.getElementById('login-pass').value.trim();
 
   if (user === 'admin' && pass === 'admin123') {
-    currentRole = 'admin'; // Admin: Can view and update report status (done or pending)
+    currentRole = 'admin';
     closeLoginModal();
     updateRoleView();
   } else if (user === 'user' && pass === 'pogi') {
-    currentRole = 'sysadmin'; // System Admin: Full access + notifications + delete
+    currentRole = 'sysadmin';
     closeLoginModal();
     updateRoleView();
   } else {
@@ -268,7 +267,6 @@ function updateRoleView() {
   const publicView = document.getElementById('public-view-container');
   const managementView = document.getElementById('management-view-container');
 
-  // Hide all navs and views first
   publicNav.classList.add('hidden');
   adminNav.classList.add('hidden');
   sysadminNav.classList.add('hidden');
@@ -279,7 +277,7 @@ function updateRoleView() {
     adminNav.classList.remove('hidden');
     adminNav.classList.add('flex');
     managementView.classList.remove('hidden');
-    document.getElementById('workspace-title').innerText = 'Admin Command Center (Status Management)';
+    document.getElementById('workspace-title').innerText = 'Admin Command Center (Exact Coordinates & Status)';
     document.getElementById('role-badge').innerText = 'LGU Admin Mode';
     renderManagementTable();
     updateStats();
@@ -292,7 +290,6 @@ function updateRoleView() {
     renderManagementTable();
     updateStats();
   } else {
-    // Public / People Mode
     publicNav.classList.remove('hidden');
     publicView.classList.remove('hidden');
     document.getElementById('notif-dropdown').classList.add('hidden');
@@ -364,7 +361,7 @@ function handleFormSubmit(e) {
 }
 
 // ==========================================
-// RENDERING & STATUS MANAGEMENT
+// RENDERING & MANAGEMENT TABLE
 // ==========================================
 function getReportsArray() {
   return Object.keys(reportsMap).map(key => ({
@@ -444,48 +441,62 @@ function renderManagementTable() {
   if (!tbody) return;
 
   if (reportsList.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-500">No reports in cloud database.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-slate-500">No reports in cloud database.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = reportsList.map(r => `
-    <tr class="hover:bg-slate-800/50 transition">
-      <td class="p-3">
-        ${r.photo 
-          ? `<img src="${r.photo}" onclick="openImageModal('${r.photo}')" alt="Hazard" class="w-10 h-10 object-cover rounded-md border border-slate-700 cursor-pointer hover:opacity-80 transition">`
-          : `<div class="w-10 h-10 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500 text-[10px]">None</div>`
-        }
-      </td>
-      <td class="p-3 font-semibold text-white">${r.name}</td>
-      <td class="p-3 text-slate-300">${r.category}</td>
-      <td class="p-3">
-        <span class="block text-blue-400 font-semibold">${r.barangay ? `Brgy. ${r.barangay}` : 'GenSan'}</span>
-        <span class="text-slate-400 text-[11px]">${r.location}</span>
-      </td>
-      <td class="p-3 text-slate-400 max-w-xs truncate" title="${r.desc}">${r.desc}</td>
-      <td class="p-3 text-slate-400">${r.date || 'Today'}</td>
-      <td class="p-3">
-        <span class="px-2.5 py-1 text-[11px] rounded-full font-semibold ${
-          r.status === 'Resolved' ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700' : 'bg-amber-900/60 text-amber-300 border border-amber-700'
-        }">
-          ${r.status === 'Resolved' ? 'Done' : r.status}
-        </span>
-      </td>
-      <td class="p-3 text-right space-x-1.5 whitespace-nowrap">
-        <!-- Both Admin and SysAdmin can toggle status -->
-        <button onclick="toggleReportStatus('${r.key}', '${r.status}')" class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
-          ${r.status === 'Resolved' ? 'Mark Pending' : 'Mark Done'}
-        </button>
-        
-        <!-- Only System Admin (user / pogi) can delete reports -->
-        ${currentRole === 'sysadmin' ? `
-          <button onclick="deleteReport('${r.key}')" class="bg-red-600/80 hover:bg-red-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
-            Delete
+  tbody.innerHTML = reportsList.map(r => {
+    const lat = r.lat || '6.116400';
+    const lng = r.lng || '125.171600';
+    const gmapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
+
+    return `
+      <tr class="hover:bg-slate-800/50 transition">
+        <td class="p-3">
+          ${r.photo 
+            ? `<img src="${r.photo}" onclick="openImageModal('${r.photo}')" alt="Hazard" class="w-10 h-10 object-cover rounded-md border border-slate-700 cursor-pointer hover:opacity-80 transition">`
+            : `<div class="w-10 h-10 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500 text-[10px]">None</div>`
+          }
+        </td>
+        <td class="p-3 font-semibold text-white">${r.name}</td>
+        <td class="p-3 text-slate-300">${r.category}</td>
+        <td class="p-3">
+          <span class="block text-blue-400 font-semibold">${r.barangay ? `Brgy. ${r.barangay}` : 'GenSan'}</span>
+          <span class="text-slate-400 text-[11px]">${r.location}</span>
+        </td>
+        <td class="p-3">
+          <div class="font-mono text-slate-300 text-[11px]">${lat}, ${lng}</div>
+          <a href="${gmapsLink}" target="_blank" class="inline-flex items-center gap-1 text-[10px] text-blue-400 hover:underline mt-0.5">
+            <i data-lucide="external-link" class="w-3 h-3"></i> Open in Maps
+          </a>
+        </td>
+        <td class="p-3 text-slate-400 max-w-xs truncate" title="${r.desc}">${r.desc}</td>
+        <td class="p-3 text-slate-400">${r.date || 'Today'}</td>
+        <td class="p-3">
+          <span class="px-2.5 py-1 text-[11px] rounded-full font-semibold ${
+            r.status === 'Resolved' ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700' : 'bg-amber-900/60 text-amber-300 border border-amber-700'
+          }">
+            ${r.status === 'Resolved' ? 'Done' : r.status}
+          </span>
+        </td>
+        <td class="p-3 text-right space-x-1.5 whitespace-nowrap">
+          <button onclick="toggleReportStatus('${r.key}', '${r.status}')" class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
+            ${r.status === 'Resolved' ? 'Mark Pending' : 'Mark Done'}
           </button>
-        ` : ''}
-      </td>
-    </tr>
-  `).join('');
+          
+          ${currentRole === 'sysadmin' ? `
+            <button onclick="deleteReport('${r.key}')" class="bg-red-600/80 hover:bg-red-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
+              Delete
+            </button>
+          ` : ''}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 }
 
 function toggleReportStatus(key, currentStatus) {
@@ -506,7 +517,7 @@ function deleteReport(key) {
 }
 
 // ==========================================
-// NOTIFICATIONS (System Admin Only)
+// NOTIFICATIONS
 // ==========================================
 function toggleNotifications() {
   const dropdown = document.getElementById('notif-dropdown');

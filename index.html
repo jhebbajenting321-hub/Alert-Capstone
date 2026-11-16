@@ -49,7 +49,7 @@
         </button>
       </nav>
 
-      <!-- ADMIN NAVIGATION (Can View & Update Status) -->
+      <!-- ADMIN NAVIGATION -->
       <nav id="admin-nav" class="hidden items-center space-x-4 text-sm font-medium">
         <span class="bg-emerald-100 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
           <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i> Admin Management Mode
@@ -59,7 +59,7 @@
         </button>
       </nav>
 
-      <!-- SYSTEM ADMIN NAVIGATION (Full Access + Notifications) -->
+      <!-- SYSTEM ADMIN NAVIGATION -->
       <nav id="sysadmin-nav" class="hidden items-center space-x-4 md:space-x-6 text-sm font-medium">
         <div class="relative">
           <button id="notif-btn" onclick="toggleNotifications()" class="relative p-2 text-slate-600 hover:text-blue-600 focus:outline-none rounded-full hover:bg-slate-100 transition">
@@ -341,7 +341,7 @@
       <section class="bg-slate-900 text-white rounded-xl p-6 shadow-md border border-slate-800 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
           <h2 class="text-base font-bold text-white">Citizen Hazard Reports Database</h2>
-          <span class="text-xs text-slate-400">Status controls & management</span>
+          <span class="text-xs text-slate-400">Exact GPS Coordinates & Status Controls</span>
         </div>
         
         <div class="overflow-x-auto">
@@ -352,6 +352,7 @@
                 <th class="p-3">Reporter</th>
                 <th class="p-3">Category</th>
                 <th class="p-3">Barangay / Location</th>
+                <th class="p-3">Exact Coordinates</th>
                 <th class="p-3">Description</th>
                 <th class="p-3">Submitted</th>
                 <th class="p-3">Status</th>
