@@ -1,5 +1,5 @@
 // ==========================================
-// FIREBASE CONFIGURATION (Project: city-alert-123)
+// FIREBASE CONFIGURATION
 // ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyB-mquyQjD862qE20iK078xk0-5iLv40wA",
@@ -12,7 +12,6 @@ const firebaseConfig = {
   measurementId: "G-N7BG5BWQGZ"
 };
 
-// Initialize Firebase
 let db = null;
 let reportsRef = null;
 
@@ -26,14 +25,13 @@ try {
   console.warn("Firebase initialization error:", e);
 }
 
-// System State
-let isAdminLoggedIn = false;
+// Role State: 'public', 'admin', or 'sysadmin'
+let currentRole = 'public';
 let notifications = [];
 let reportsMap = {};
 let initialLoadComplete = false;
 let currentPhotoBase64 = "";
 
-// Leaflet Map Instances (Centered on General Santos City)
 const GENSAN_COORDS = [6.1164, 125.1716];
 let publicMap = null;
 let publicMarkersLayer = null;
@@ -48,17 +46,16 @@ document.addEventListener('DOMContentLoaded', () => {
   initMaps();
 
   if (reportsRef) {
-    // Realtime Listener for Cross-Device Cloud Syncing
     reportsRef.on('value', (snapshot) => {
       const data = snapshot.val() || {};
       
-      if (initialLoadComplete && isAdminLoggedIn) {
+      if (initialLoadComplete && currentRole === 'sysadmin') {
         Object.keys(data).forEach(key => {
           if (!reportsMap[key]) {
             const newRep = data[key];
             const newNotif = {
               id: Date.now(),
-              message: `New report in Brgy. ${newRep.barangay || 'GenSan'} (${newRep.location}): ${newRep.category}`,
+              message: `New report in Brgy. ${newRep.barangay || 'GenSan'}: ${newRep.category}`,
               time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               read: false
             };
@@ -74,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
       updateStats();
       renderUserSubmissions();
       updatePublicMapMarkers();
-      if (isAdminLoggedIn) renderAdminTable();
+      if (currentRole !== 'public') renderManagementTable();
     });
   } else {
     updateStats();
@@ -83,22 +80,20 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================
-// LEAFLET GIS MAP INTEGRATION
+// LEAFLET GIS MAPS
 // ==========================================
 function initMaps() {
   if (typeof L === 'undefined') return;
 
-  // 1. Live Public Hazard Map
   const publicMapEl = document.getElementById('public-map');
   if (publicMapEl) {
     publicMap = L.map('public-map').setView(GENSAN_COORDS, 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors | CityAlert GenSan'
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(publicMap);
     publicMarkersLayer = L.layerGroup().addTo(publicMap);
   }
 
-  // 2. Form Coordinate Picker Map
   const pickerMapEl = document.getElementById('picker-map');
   if (pickerMapEl) {
     pickerMap = L.map('picker-map').setView(GENSAN_COORDS, 14);
@@ -145,7 +140,7 @@ function detectUserGPS() {
       }
     },
     () => {
-      alert("Unable to retrieve GPS location. You can click directly on the map to pin the hazard.");
+      alert("Unable to retrieve GPS location. Please click directly on the map.");
     }
   );
 }
@@ -185,7 +180,7 @@ function updatePublicMapMarkers() {
 }
 
 // ==========================================
-// PHOTO UPLOAD & COMPRESSION HANDLER
+// PHOTO COMPRESSION & MODAL
 // ==========================================
 function previewPhoto(event) {
   const file = event.target.files[0];
@@ -195,7 +190,6 @@ function previewPhoto(event) {
   reader.onload = function (e) {
     const img = new Image();
     img.onload = function () {
-      // Compress image via canvas so it stores cleanly in Firebase RTDB
       const canvas = document.createElement('canvas');
       const MAX_WIDTH = 600;
       const scaleSize = MAX_WIDTH / img.width;
@@ -236,7 +230,7 @@ function closeImageModal() {
 }
 
 // ==========================================
-// MODAL & ADMIN AUTHENTICATION
+// AUTHENTICATION & ROLE MANAGEMENT
 // ==========================================
 function openLoginModal() {
   document.getElementById('login-modal').classList.remove('hidden');
@@ -249,40 +243,58 @@ function closeLoginModal() {
   document.getElementById('login-error').classList.add('hidden');
 }
 
-function handleAdminLogin(e) {
+function handleLogin(e) {
   e.preventDefault();
-  const user = document.getElementById('admin-user').value;
-  const pass = document.getElementById('admin-pass').value;
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value.trim();
 
   if (user === 'admin' && pass === 'admin123') {
-    isAdminLoggedIn = true;
+    currentRole = 'admin'; // Admin: Can view and update report status (done or pending)
     closeLoginModal();
-    toggleViewMode();
+    updateRoleView();
+  } else if (user === 'user' && pass === 'pogi') {
+    currentRole = 'sysadmin'; // System Admin: Full access + notifications + delete
+    closeLoginModal();
+    updateRoleView();
   } else {
     document.getElementById('login-error').classList.remove('hidden');
   }
 }
 
-function toggleViewMode() {
+function updateRoleView() {
   const publicNav = document.getElementById('public-nav');
   const adminNav = document.getElementById('admin-nav');
+  const sysadminNav = document.getElementById('sysadmin-nav');
   const publicView = document.getElementById('public-view-container');
-  const adminView = document.getElementById('admin-view-container');
+  const managementView = document.getElementById('management-view-container');
 
-  if (isAdminLoggedIn) {
-    publicNav.classList.add('hidden');
-    publicView.classList.add('hidden');
+  // Hide all navs and views first
+  publicNav.classList.add('hidden');
+  adminNav.classList.add('hidden');
+  sysadminNav.classList.add('hidden');
+  publicView.classList.add('hidden');
+  managementView.classList.add('hidden');
+
+  if (currentRole === 'admin') {
     adminNav.classList.remove('hidden');
     adminNav.classList.add('flex');
-    adminView.classList.remove('hidden');
-    renderAdminTable();
+    managementView.classList.remove('hidden');
+    document.getElementById('workspace-title').innerText = 'Admin Command Center (Status Management)';
+    document.getElementById('role-badge').innerText = 'LGU Admin Mode';
+    renderManagementTable();
+    updateStats();
+  } else if (currentRole === 'sysadmin') {
+    sysadminNav.classList.remove('hidden');
+    sysadminNav.classList.add('flex');
+    managementView.classList.remove('hidden');
+    document.getElementById('workspace-title').innerText = 'System Admin Master Dashboard';
+    document.getElementById('role-badge').innerText = 'System Admin (user / pogi)';
+    renderManagementTable();
     updateStats();
   } else {
+    // Public / People Mode
     publicNav.classList.remove('hidden');
     publicView.classList.remove('hidden');
-    adminNav.classList.add('hidden');
-    adminNav.classList.remove('flex');
-    adminView.classList.add('hidden');
     document.getElementById('notif-dropdown').classList.add('hidden');
     renderUserSubmissions();
     updateStats();
@@ -290,13 +302,13 @@ function toggleViewMode() {
   }
 }
 
-function logoutAdmin() {
-  isAdminLoggedIn = false;
-  toggleViewMode();
+function logoutRole() {
+  currentRole = 'public';
+  updateRoleView();
 }
 
 // ==========================================
-// PUBLIC SUBMISSION HANDLER
+// SUBMISSION HANDLER
 // ==========================================
 function handleFormSubmit(e) {
   e.preventDefault();
@@ -352,7 +364,7 @@ function handleFormSubmit(e) {
 }
 
 // ==========================================
-// DATA RENDERING & DASHBOARD UPDATES
+// RENDERING & STATUS MANAGEMENT
 // ==========================================
 function getReportsArray() {
   return Object.keys(reportsMap).map(key => ({
@@ -371,11 +383,11 @@ function updateStats() {
   document.getElementById('stat-pending').innerText = pending;
   document.getElementById('stat-resolved').innerText = resolved;
 
-  const adminTotal = document.getElementById('admin-stat-total');
-  if (adminTotal) {
-    adminTotal.innerText = total;
-    document.getElementById('admin-stat-pending').innerText = pending;
-    document.getElementById('admin-stat-resolved').innerText = resolved;
+  const mgmtTotal = document.getElementById('mgmt-stat-total');
+  if (mgmtTotal) {
+    mgmtTotal.innerText = total;
+    document.getElementById('mgmt-stat-pending').innerText = pending;
+    document.getElementById('mgmt-stat-resolved').innerText = resolved;
   }
 }
 
@@ -418,15 +430,15 @@ function renderUserSubmissions() {
           r.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
         }">
           <span class="w-1.5 h-1.5 rounded-full ${r.status === 'Resolved' ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
-          ${r.status}
+          ${r.status === 'Resolved' ? 'Done' : r.status}
         </span>
       </td>
     </tr>
   `).join('');
 }
 
-function renderAdminTable() {
-  const tbody = document.getElementById('admin-table-body');
+function renderManagementTable() {
+  const tbody = document.getElementById('mgmt-table-body');
   const reportsList = getReportsArray();
 
   if (!tbody) return;
@@ -453,40 +465,48 @@ function renderAdminTable() {
       <td class="p-3 text-slate-400 max-w-xs truncate" title="${r.desc}">${r.desc}</td>
       <td class="p-3 text-slate-400">${r.date || 'Today'}</td>
       <td class="p-3">
-        <span class="px-2 py-0.5 text-[10px] rounded-full font-semibold ${
+        <span class="px-2.5 py-1 text-[11px] rounded-full font-semibold ${
           r.status === 'Resolved' ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700' : 'bg-amber-900/60 text-amber-300 border border-amber-700'
         }">
-          ${r.status}
+          ${r.status === 'Resolved' ? 'Done' : r.status}
         </span>
       </td>
       <td class="p-3 text-right space-x-1.5 whitespace-nowrap">
-        ${r.status === 'Pending' ? `
-          <button onclick="resolveReport('${r.key}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
-            Resolve
+        <!-- Both Admin and SysAdmin can toggle status -->
+        <button onclick="toggleReportStatus('${r.key}', '${r.status}')" class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
+          ${r.status === 'Resolved' ? 'Mark Pending' : 'Mark Done'}
+        </button>
+        
+        <!-- Only System Admin (user / pogi) can delete reports -->
+        ${currentRole === 'sysadmin' ? `
+          <button onclick="deleteReport('${r.key}')" class="bg-red-600/80 hover:bg-red-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
+            Delete
           </button>
         ` : ''}
-        <button onclick="deleteReport('${r.key}')" class="bg-red-600/80 hover:bg-red-500 text-white px-2.5 py-1 rounded text-[10px] font-semibold transition">
-          Delete
-        </button>
       </td>
     </tr>
   `).join('');
 }
 
-function resolveReport(key) {
+function toggleReportStatus(key, currentStatus) {
   if (reportsRef && key) {
-    reportsRef.child(key).update({ status: 'Resolved' });
+    const newStatus = currentStatus === 'Resolved' ? 'Pending' : 'Resolved';
+    reportsRef.child(key).update({ status: newStatus });
   }
 }
 
 function deleteReport(key) {
-  if (reportsRef && key) {
+  if (currentRole !== 'sysadmin') {
+    alert("Unauthorized: Only System Admin can delete records.");
+    return;
+  }
+  if (reportsRef && key && confirm("Are you sure you want to delete this report?")) {
     reportsRef.child(key).remove();
   }
 }
 
 // ==========================================
-// NOTIFICATIONS
+// NOTIFICATIONS (System Admin Only)
 // ==========================================
 function toggleNotifications() {
   const dropdown = document.getElementById('notif-dropdown');
